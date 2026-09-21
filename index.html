@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="fr" data-theme="sombre">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Suivi Calorique</title>
+<meta name="description" content="Suivi des calories et macronutriments par repas.">
+<meta name="theme-color" content="#14532d">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="manifest" href="./manifest.json">
+<link rel="icon" href="./icon-192.png">
+<link rel="apple-touch-icon" href="./icon-192.png">
+<link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+
+<p id="annonce" class="annonce" role="status" aria-live="polite"></p>
+
+<header class="entete">
+  <h1>Suivi Calorique</h1>
+
+  <!-- ====== Bascule Journal / Tendances (Phase 6) ====== -->
+  <nav class="nav-vues" aria-label="Changer de vue">
+    <button type="button" id="btn-vue-journal" class="onglet-vue" aria-pressed="true">Journal</button>
+    <button type="button" id="btn-vue-tendances" class="onglet-vue" aria-pressed="false">Tendances</button>
+  </nav>
+
+  <div id="bloc-nav-jour">
+    <nav class="nav-jour" aria-label="Navigation entre les jours">
+      <button id="btn-jour-prec" aria-label="Jour précédent">◀</button>
+      <button id="btn-jour-txt" class="jour-txt" aria-label="Revenir à aujourd'hui">Aujourd'hui</button>
+      <button id="btn-jour-suiv" aria-label="Jour suivant">▶</button>
+      <button type="button" id="btn-choisir-date" aria-label="Choisir une date précise">📅</button>
+    </nav>
+    <!-- Repliée par défaut : le bouton calendrier ci-dessus la révèle,
+         pour naviguer directement à une date plutôt que jour par jour. -->
+    <input type="date" id="date-historique" class="date-historique" aria-label="Aller à une date" hidden>
+  </div>
+</header>
+
+<!-- ====== Vue "Journal" : le jour consulté (aujourd'hui ou historique) ====== -->
+<div id="vue-journal">
+
+  <!-- ====== Bandeau d'alerte en cas de dépassement (aujourd'hui uniquement) ====== -->
+  <div id="bandeau-depassement" class="bandeau-depassement" role="alert" hidden></div>
+
+  <!-- ====== Rappel de l'objectif actuellement actif ====== -->
+  <section class="carte-objectif">
+    <div class="objectif-texte">
+      <span class="objectif-label">Objectif quotidien</span>
+      <strong id="objectif-resume">Aucun objectif défini</strong>
+    </div>
+    <button type="button" id="btn-modifier-objectif">Modifier l'objectif</button>
+  </section>
+
+  <!-- Affichée uniquement en consultant un jour passé : l'ajout n'est
+       proposé que pour aujourd'hui (voir section 5 de app.js), mais la
+       suppression d'une entrée reste possible pour corriger une erreur. -->
+  <p id="mention-lecture-seule" class="mention-lecture-seule" hidden>
+    Jour passé — consultation seule (la suppression d'un aliment reste possible).
+  </p>
+
+  <main id="repas-conteneur">
+    <!-- Une section par repas, générée par app.js -->
+  </main>
+
+  <footer class="pied-total">
+    <!-- Affiché uniquement si un objectif est actif pour le jour consulté -->
+    <div id="zone-progression" class="zone-progression" hidden>
+      <div class="barre-progression">
+        <div class="barre-entete">
+          <span>Calories</span>
+          <span id="calories-valeurs">0 / 0 kcal</span>
+        </div>
+        <div class="barre-piste">
+          <div id="calories-remplissage" class="barre-remplissage"></div>
+        </div>
+      </div>
+      <div class="barre-progression">
+        <div class="barre-entete">
+          <span>Protéines</span>
+          <span id="proteines-valeurs">0 / 0 g</span>
+        </div>
+        <div class="barre-piste">
+          <div id="proteines-remplissage" class="barre-remplissage"></div>
+        </div>
+      </div>
+      <!-- Indicateur factuel "ce jour-là" (Phase 6), distinct du bandeau
+           rouge ci-dessus qui, lui, ne concerne QUE le jour même. -->
+      <p id="indicateur-depassement-jour" class="indicateur-depassement-jour" hidden>
+        ⚠ Objectif dépassé ce jour-là
+      </p>
+    </div>
+
+    <!-- Affiché uniquement pour un jour sans objectif actif (avant le tout premier objectif défini) -->
+    <p id="message-sans-objectif" class="message-sans-objectif" hidden>
+      Aucun objectif n'était défini pour ce jour-là.
+    </p>
+  </footer>
+</div>
+
+<!-- ====== Vue "Tendances" : aperçu des 7 derniers jours (Phase 6) ====== -->
+<section id="vue-tendances" class="vue-tendances" hidden>
+  <h2>7 derniers jours</h2>
+  <p id="tendances-resume" class="tendances-resume"></p>
+  <div id="graphique-tendances" class="graphique-tendances" role="img" aria-label="Graphique des calories des 7 derniers jours"></div>
+  <p class="tendances-legende">
+    <span class="legende-item"><span class="legende-puce puce-normale"></span> Sous l'objectif</span>
+    <span class="legende-item"><span class="legende-puce puce-depassement"></span> Objectif dépassé</span>
+    <span class="legende-item"><span class="legende-trait"></span> Objectif du jour</span>
+  </p>
+</section>
+
+<!-- ====== Écran de premier lancement : aucun objectif n'existe encore ====== -->
+<section id="vue-onboarding" class="vue-onboarding" hidden>
+  <form id="form-onboarding" class="formulaire">
+    <h2>Bienvenue !</h2>
+    <p>Pour commencer, définissez votre objectif quotidien.</p>
+
+    <label for="ob-calories">Objectif calorique (kcal)</label>
+    <input type="number" id="ob-calories" name="calories" min="1" step="1" required inputmode="decimal">
+
+    <label for="ob-proteines">Objectif protéines (g)</label>
+    <input type="number" id="ob-proteines" name="proteines" min="1" step="1" required inputmode="decimal">
+
+    <div class="dialogue-actions">
+      <button type="submit" class="bouton-principal">Commencer</button>
+    </div>
+  </form>
+</section>
+
+<!-- ====== Formulaire d'ajout manuel (dans une boîte de dialogue native) ====== -->
+<dialog id="dialogue-ajout" class="boite-dialogue">
+  <form id="form-ajout" class="formulaire" method="dialog">
+    <h2 id="dialogue-titre">Ajouter un aliment</h2>
+
+    <label for="f-nom">Nom de l'aliment</label>
+    <input type="text" id="f-nom" name="nom" required autocomplete="off">
+
+    <label for="f-quantite">Quantité consommée (g)</label>
+    <input type="number" id="f-quantite" name="quantite" min="1" step="1" required inputmode="decimal">
+
+    <fieldset>
+      <legend>Valeurs nutritionnelles pour 100 g</legend>
+
+      <label for="f-calories">Calories (kcal)</label>
+      <input type="number" id="f-calories" name="calories" min="0" step="0.1" required inputmode="decimal">
+
+      <label for="f-proteines">Protéines (g)</label>
+      <input type="number" id="f-proteines" name="proteines" min="0" step="0.1" inputmode="decimal">
+
+      <label for="f-glucides">Glucides (g)</label>
+      <input type="number" id="f-glucides" name="glucides" min="0" step="0.1" inputmode="decimal">
+
+      <label for="f-lipides">Lipides (g)</label>
+      <input type="number" id="f-lipides" name="lipides" min="0" step="0.1" inputmode="decimal">
+    </fieldset>
+
+    <div class="dialogue-actions">
+      <button type="button" id="btn-annuler-ajout" class="bouton-secondaire">Annuler</button>
+      <button type="submit" class="bouton-principal">Ajouter</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- ====== Choix du mode d'ajout : scanner, photo de l'étiquette ou saisie manuelle ====== -->
+<dialog id="dialogue-choix-ajout" class="boite-dialogue">
+  <h2>Ajouter un aliment</h2>
+  <div class="choix-ajout">
+    <button type="button" id="btn-choix-scanner" class="bouton-choix">
+      <span class="choix-icone" aria-hidden="true">📷</span>
+      <span>Scanner un code-barres</span>
+    </button>
+    <button type="button" id="btn-choix-photo" class="bouton-choix">
+      <span class="choix-icone" aria-hidden="true">🖼️</span>
+      <span>Photo de l'étiquette</span>
+    </button>
+    <button type="button" id="btn-choix-manuel" class="bouton-choix">
+      <span class="choix-icone" aria-hidden="true">✏️</span>
+      <span>Saisie manuelle</span>
+    </button>
+  </div>
+  <div class="dialogue-actions">
+    <button type="button" id="btn-annuler-choix" class="bouton-secondaire">Annuler</button>
+  </div>
+</dialog>
+
+<!-- ====== Scanner de code-barres (caméra) ====== -->
+<dialog id="dialogue-scanner" class="boite-dialogue boite-dialogue-scanner">
+  <h2>Scanner un code-barres</h2>
+  <p class="scanner-consigne">Visez le code-barres de l'emballage avec la caméra.</p>
+
+  <div id="lecteur-scanner" class="lecteur-scanner"></div>
+
+  <p id="scanner-etat" class="scanner-etat" role="status" aria-live="polite"></p>
+
+  <!-- Un seul de ces trois cas est affiché à la fois : permission caméra
+       refusée, pas de connexion internet, produit introuvable sur Open
+       Food Facts. Le message doit permettre à l'utilisateur de comprendre
+       lequel s'est produit. -->
+  <div id="scanner-erreur" class="scanner-erreur" hidden>
+    <p id="scanner-erreur-texte"></p>
+    <div class="dialogue-actions">
+      <button type="button" id="btn-scanner-reessayer" class="bouton-secondaire">Réessayer le scan</button>
+      <button type="button" id="btn-scanner-saisie-manuelle" class="bouton-principal">Saisie manuelle</button>
+    </div>
+  </div>
+
+  <div class="dialogue-actions">
+    <button type="button" id="btn-annuler-scanner" class="bouton-secondaire">Annuler</button>
+  </div>
+</dialog>
+
+<!-- ====== Confirmation post-scan : valeurs récupérées (cache ou API), modifiables avant ajout ====== -->
+<dialog id="dialogue-confirmation" class="boite-dialogue">
+  <form id="form-confirmation" class="formulaire" method="dialog">
+    <h2>Confirmer l'aliment</h2>
+    <p id="confirmation-origine" class="confirmation-origine"></p>
+
+    <label for="c-nom">Nom du produit</label>
+    <input type="text" id="c-nom" name="nom" required autocomplete="off">
+
+    <fieldset>
+      <legend>Valeurs nutritionnelles pour 100 g</legend>
+
+      <label for="c-calories">Calories (kcal)</label>
+      <input type="number" id="c-calories" name="calories" min="0" step="0.1" required inputmode="decimal">
+
+      <label for="c-proteines">Protéines (g)</label>
+      <input type="number" id="c-proteines" name="proteines" min="0" step="0.1" inputmode="decimal">
+
+      <label for="c-glucides">Glucides (g)</label>
+      <input type="number" id="c-glucides" name="glucides" min="0" step="0.1" inputmode="decimal">
+
+      <label for="c-lipides">Lipides (g)</label>
+      <input type="number" id="c-lipides" name="lipides" min="0" step="0.1" inputmode="decimal">
+    </fieldset>
+
+    <label for="c-quantite">Quantité consommée (g)</label>
+    <input type="number" id="c-quantite" name="quantite" min="1" step="1" required inputmode="decimal" value="100">
+
+    <label for="c-repas">Repas</label>
+    <select id="c-repas" name="repas">
+      <option value="petit-dejeuner">Petit-déjeuner</option>
+      <option value="dejeuner">Déjeuner</option>
+      <option value="diner">Dîner</option>
+      <option value="collation">Collation</option>
+    </select>
+
+    <p class="confirmation-calcul">
+      Pour cette quantité : <strong id="confirmation-calories-calc">0 kcal</strong> ·
+      <strong id="confirmation-proteines-calc">0 g</strong> de protéines
+    </p>
+
+    <div class="dialogue-actions">
+      <button type="button" id="btn-annuler-confirmation" class="bouton-secondaire">Annuler</button>
+      <button type="submit" class="bouton-principal">Ajouter au journal</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- ====== Analyse OCR d'une photo d'étiquette (Phase 4) ====== -->
+<dialog id="dialogue-ocr" class="boite-dialogue">
+  <h2>Lecture de l'étiquette</h2>
+  <p class="ocr-consigne">La photo est analysée sur l'appareil (aucun envoi sur internet), cela peut prendre quelques secondes.</p>
+
+  <p id="ocr-etat" class="ocr-etat" role="status" aria-live="polite">Préparation…</p>
+  <div class="ocr-barre-piste">
+    <div id="ocr-barre-progression" class="ocr-barre-remplissage"></div>
+  </div>
+
+  <!-- Un seul de ces deux cas est affiché à la fois : aucune valeur
+       nutritionnelle repérée sur la photo, ou analyse trop longue. -->
+  <div id="ocr-erreur" class="ocr-erreur" hidden>
+    <p id="ocr-erreur-texte"></p>
+    <div class="dialogue-actions">
+      <button type="button" id="btn-ocr-reprendre-photo" class="bouton-secondaire">Reprendre la photo</button>
+      <button type="button" id="btn-ocr-saisie-manuelle" class="bouton-principal">Saisie manuelle</button>
+    </div>
+  </div>
+
+  <div class="dialogue-actions">
+    <button type="button" id="btn-annuler-ocr" class="bouton-secondaire">Annuler</button>
+  </div>
+</dialog>
+
+<!-- Élément cliqué par le bouton "Photo de l'étiquette" : "capture"
+     ouvre directement l'appareil photo sur mobile plutôt que la galerie. -->
+<input type="file" id="entree-photo-etiquette" accept="image/*" capture="environment" hidden>
+
+<!-- ====== Formulaire de définition / modification de l'objectif ====== -->
+<dialog id="dialogue-objectif" class="boite-dialogue">
+  <form id="form-objectif" class="formulaire" method="dialog">
+    <h2>Objectif quotidien</h2>
+
+    <label for="f-objectif-calories">Objectif calorique (kcal)</label>
+    <input type="number" id="f-objectif-calories" name="calories" min="1" step="1" required inputmode="decimal">
+
+    <label for="f-objectif-proteines">Objectif protéines (g)</label>
+    <input type="number" id="f-objectif-proteines" name="proteines" min="1" step="1" required inputmode="decimal">
+
+    <!-- ====== Activation des notifications de dépassement (Phase 5) ======
+         Volontairement pas proposé au premier lancement (écran
+         d'onboarding) : ici, dans les paramètres, c'est le moment où
+         l'utilisateur a déjà un contexte pour comprendre à quoi ça sert. -->
+    <div class="option-notifications">
+      <label class="etiquette-case">
+        <input type="checkbox" id="f-notifications-activees">
+        Recevoir une alerte même quand l'app est fermée si vous dépassez votre objectif calorique
+      </label>
+      <p id="notifications-etat" class="notifications-etat" hidden></p>
+    </div>
+
+    <div class="dialogue-actions">
+      <button type="button" id="btn-annuler-objectif" class="bouton-secondaire">Annuler</button>
+      <button type="submit" class="bouton-principal">Enregistrer</button>
+    </div>
+  </form>
+</dialog>
+
+<script src="./lib/html5-qrcode.min.js" defer></script>
+<script src="./lib/tesseract/tesseract.min.js" defer></script>
+<script src="./app.js" defer></script>
+</body>
+</html>
