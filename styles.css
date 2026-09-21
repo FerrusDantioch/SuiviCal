@@ -1,0 +1,706 @@
+/* ============================================================
+   SUIVI CALORIQUE — feuille de style
+   Thème sombre par défaut, clair via prefers-color-scheme.
+   ============================================================ */
+
+:root {
+  --bg:          #121814;
+  --surface:     #1a2219;
+  --surface-2:   #212b20;
+  --bord:        #33402f;
+  --texte:       #dfe6da;
+  --texte-doux:  #93a08c;
+  --accent:      #4ade80;
+  --accent-fond: #1c3524;
+  --danger:      #e57373;
+  --danger-fond: #3a1e1c;
+  /* Couleur de TEXTE à utiliser par-dessus un fond `--danger` (le
+     bandeau de dépassement, notamment). Contrairement à `--accent`,
+     dont les deux variantes (sombre/claire) sont assez proches en
+     luminosité pour qu'un texte foncé fixe passe partout, `--danger`
+     s'inverse d'un thème à l'autre (clair en sombre, foncé en clair) :
+     un texte blanc fixe manquait de contraste en thème sombre — d'où
+     cette variable plutôt qu'une couleur codée en dur. */
+  --texte-sur-danger: #2a0a08;
+  --rayon: 14px;
+  --duree: 160ms;
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg:          #f3f5f0;
+    --surface:     #ffffff;
+    --surface-2:   #eef1e9;
+    --bord:        #d7ddd0;
+    --texte:       #232920;
+    --texte-doux:  #5b6555;
+    --accent:      #2f9e5c;
+    --accent-fond: #e3f3e6;
+    --danger:      #c0392b;
+    --danger-fond: #fbe4e1;
+    --texte-sur-danger: #ffffff;
+  }
+}
+
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+html, body {
+  margin: 0;
+  min-height: 100%;
+  background: var(--bg);
+  color: var(--texte);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-size: 16px;
+  line-height: 1.4;
+}
+
+body {
+  display: flex;
+  flex-direction: column;
+  padding-bottom: 150px; /* laisse la place au pied fixe (deux barres de progression) */
+}
+
+/* En vue Tendances, le pied fixe de la vue Journal est masqué : inutile
+   de lui réserver de la place en bas de l'écran. */
+body.mode-tendances {
+  padding-bottom: 24px;
+}
+
+button, input {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  cursor: pointer;
+  border: none;
+  border-radius: var(--rayon);
+  background: var(--surface-2);
+  color: var(--texte);
+  min-height: 44px;
+  padding: 10px 16px;
+  transition: background var(--duree), transform var(--duree);
+}
+
+button:active { transform: scale(0.97); }
+
+button.bouton-secondaire { background: transparent; border: 1px solid var(--bord); }
+
+/* ---------- Annonce lecteurs d'écran (invisible) ---------- */
+.annonce {
+  position: absolute; width: 1px; height: 1px; overflow: hidden;
+  clip: rect(0 0 0 0); white-space: nowrap;
+}
+
+/* ---------- En-tête ---------- */
+.entete {
+  position: sticky; top: 0; z-index: 5;
+  background: var(--bg);
+  padding: 16px 16px 8px;
+  border-bottom: 1px solid var(--bord);
+}
+
+.entete h1 { margin: 0 0 10px; font-size: 1.3rem; }
+
+#bloc-nav-jour {
+  margin-top: 10px;
+}
+
+.nav-jour {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.nav-jour .jour-txt {
+  flex: 1;
+  text-align: center;
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+#btn-choisir-date {
+  min-width: 40px;
+  padding: 10px 12px;
+}
+
+.date-historique {
+  margin-top: 8px;
+  width: 100%;
+  background: var(--surface-2);
+  border: 1px solid var(--bord);
+  border-radius: 10px;
+  padding: 8px 10px;
+  min-height: 40px;
+}
+
+/* ---------- Bascule Journal / Tendances ---------- */
+.nav-vues {
+  display: flex;
+  gap: 6px;
+  margin-top: 10px;
+  background: var(--surface-2);
+  border-radius: 999px;
+  padding: 4px;
+}
+
+.onglet-vue {
+  flex: 1;
+  min-height: 36px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--texte-doux);
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.onglet-vue[aria-pressed="true"] {
+  background: var(--accent);
+  color: #0b1a0f;
+}
+
+/* ---------- Bandeau d'alerte de dépassement ---------- */
+.bandeau-depassement {
+  max-width: 640px;
+  width: calc(100% - 32px);
+  margin: 12px auto 0;
+  padding: 10px 14px;
+  background: var(--danger);
+  color: var(--texte-sur-danger);
+  border-radius: var(--rayon);
+  font-weight: 600;
+  font-size: 0.9rem;
+  text-align: center;
+}
+
+/* ---------- Carte "objectif actif" ---------- */
+.carte-objectif {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  max-width: 640px;
+  width: 100%;
+  margin: 12px auto 0;
+  padding: 12px 16px;
+}
+
+.objectif-texte { display: flex; flex-direction: column; }
+.objectif-label { color: var(--texte-doux); font-size: 0.8rem; }
+.objectif-texte strong { font-size: 1rem; }
+
+/* Écran étroit : le bouton passe sous le texte plutôt que de s'écraser à côté */
+@media (max-width: 420px) {
+  .carte-objectif { flex-direction: column; align-items: stretch; }
+}
+
+/* ---------- Mention "jour passé" (Phase 6) ---------- */
+.mention-lecture-seule {
+  max-width: 640px;
+  width: calc(100% - 32px);
+  margin: 10px auto 0;
+  padding: 8px 14px;
+  background: var(--surface-2);
+  color: var(--texte-doux);
+  border-radius: var(--rayon);
+  font-size: 0.85rem;
+  text-align: center;
+}
+
+/* ---------- Contenu : sections repas ---------- */
+main {
+  flex: 1;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-width: 640px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+.section-repas {
+  background: var(--surface);
+  border: 1px solid var(--bord);
+  border-radius: var(--rayon);
+  padding: 12px 14px;
+}
+
+.section-repas .entete-repas {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.section-repas h2 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.section-repas .sous-total {
+  color: var(--texte-doux);
+  font-size: 0.85rem;
+}
+
+.btn-ajouter-repas {
+  background: var(--accent-fond);
+  color: var(--accent);
+  font-weight: 700;
+  min-width: 40px;
+  min-height: 40px;
+  padding: 0;
+  border-radius: 999px;
+}
+
+.liste-aliments {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.liste-aliments:empty::after {
+  content: "Aucun aliment enregistré.";
+  color: var(--texte-doux);
+  font-size: 0.9rem;
+}
+
+.ligne-aliment {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--surface-2);
+  border-radius: 10px;
+  padding: 8px 10px;
+}
+
+.ligne-aliment .info { flex: 1; min-width: 0; }
+.ligne-aliment .nom { font-weight: 600; overflow-wrap: anywhere; }
+.ligne-aliment .detail { color: var(--texte-doux); font-size: 0.85rem; }
+
+.ligne-aliment .kcal {
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.btn-supprimer {
+  background: transparent;
+  color: var(--danger);
+  min-width: 36px;
+  min-height: 36px;
+  padding: 0;
+  font-size: 1rem;
+}
+
+/* ---------- Pied : barres de progression du jour ---------- */
+.pied-total {
+  position: fixed;
+  left: 0; right: 0; bottom: 0;
+  background: var(--surface);
+  border-top: 1px solid var(--bord);
+  padding: 14px 20px calc(14px + env(safe-area-inset-bottom));
+  max-width: 640px;
+  margin: 0 auto;
+}
+
+.zone-progression:not([hidden]) {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.barre-entete {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.85rem;
+  margin-bottom: 4px;
+}
+
+.barre-piste {
+  background: var(--surface-2);
+  border-radius: 999px;
+  height: 10px;
+  overflow: hidden;
+}
+
+.barre-remplissage {
+  height: 100%;
+  width: 0%;
+  background: var(--accent);
+  border-radius: 999px;
+  transition: width var(--duree), background var(--duree);
+}
+
+/* Objectif atteint ou dépassé : la barre change de couleur.
+   L'alerte avec notification arrivera en Phase 5 ; ici, c'est un
+   simple repère visuel. */
+.barre-remplissage.depassement { background: var(--danger); }
+
+.message-sans-objectif {
+  margin: 0;
+  color: var(--texte-doux);
+  font-size: 0.9rem;
+  text-align: center;
+}
+
+/* Indicateur factuel "ce jour-là a dépassé l'objectif" (Phase 6),
+   affiché en consultant un jour passé. Volontairement plus discret que
+   le bandeau rouge plein (§ plus haut), qui lui est réservé à
+   aujourd'hui et déclenche en plus la notification — pas de raison
+   d'alerter aussi fort pour un fait déjà passé. */
+.indicateur-depassement-jour {
+  margin: 10px 0 0;
+  color: var(--danger);
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-align: center;
+}
+
+/* ---------- Écran de premier lancement (onboarding) ---------- */
+.vue-onboarding:not([hidden]) {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg);
+  padding: 24px;
+}
+
+.vue-onboarding h2 { margin-top: 0; }
+.vue-onboarding p { color: var(--texte-doux); }
+
+/* ---------- Dialogues et formulaires (ajout, objectif, onboarding) ---------- */
+.boite-dialogue {
+  border: none;
+  border-radius: var(--rayon);
+  padding: 20px;
+  width: min(92vw, 440px);
+  background: var(--surface);
+  color: var(--texte);
+}
+
+.boite-dialogue::backdrop {
+  background: rgba(0, 0, 0, 0.5);
+}
+
+.boite-dialogue h2 { margin-top: 0; }
+
+.formulaire {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: min(92vw, 440px);
+  max-width: 100%;
+}
+
+.formulaire label {
+  font-size: 0.85rem;
+  color: var(--texte-doux);
+  margin-top: 8px;
+}
+
+.formulaire input {
+  background: var(--surface-2);
+  border: 1px solid var(--bord);
+  border-radius: 10px;
+  padding: 10px 12px;
+  min-height: 44px;
+}
+
+.formulaire fieldset {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--bord);
+  border-radius: 10px;
+  margin-top: 12px;
+  padding: 8px 12px 12px;
+}
+
+.formulaire legend {
+  color: var(--texte-doux);
+  font-size: 0.85rem;
+  padding: 0 4px;
+}
+
+/* ---------- Option "notifications de dépassement" (dialogue objectif) ---------- */
+.option-notifications {
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--bord);
+}
+
+.etiquette-case {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 0.9rem;
+  color: var(--texte);
+  cursor: pointer;
+}
+
+.etiquette-case input[type="checkbox"] {
+  min-height: 0;
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  margin-top: 2px;
+  accent-color: var(--accent);
+}
+
+.notifications-etat {
+  margin: 8px 0 0;
+  font-size: 0.85rem;
+  color: var(--texte-doux);
+}
+
+.dialogue-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.bouton-principal {
+  background: var(--accent);
+  color: #0b1a0f;
+  font-weight: 700;
+}
+
+/* ---------- Choix du mode d'ajout ---------- */
+.choix-ajout {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.bouton-choix {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  justify-content: flex-start;
+  text-align: left;
+  background: var(--surface-2);
+  padding: 12px 14px;
+}
+
+.bouton-choix:disabled { opacity: 0.5; cursor: not-allowed; }
+.bouton-choix em { color: var(--texte-doux); font-style: normal; font-size: 0.85rem; }
+
+.choix-icone { font-size: 1.3rem; line-height: 1; }
+
+/* ---------- Scanner de code-barres ---------- */
+.boite-dialogue-scanner { width: min(92vw, 480px); }
+
+.scanner-consigne {
+  color: var(--texte-doux);
+  font-size: 0.9rem;
+  margin-top: 0;
+}
+
+.lecteur-scanner {
+  background: #000;
+  border-radius: 10px;
+  overflow: hidden;
+  min-height: 220px;
+}
+
+/* La bibliothèque html5-qrcode insère elle-même une balise <video> et,
+   en cas d'erreur avant même le démarrage de la caméra, des éléments
+   <span>/<div> de statut : on les laisse occuper toute la largeur. */
+.lecteur-scanner video { width: 100%; display: block; }
+
+.scanner-etat {
+  color: var(--texte-doux);
+  font-size: 0.85rem;
+  text-align: center;
+  min-height: 1.2em;
+}
+
+.scanner-erreur { margin-top: 8px; }
+.scanner-erreur p {
+  background: var(--danger-fond);
+  border: 1px solid var(--bord);
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 0.9rem;
+  margin: 0;
+}
+
+/* ---------- Confirmation post-scan ---------- */
+.confirmation-origine {
+  color: var(--texte-doux);
+  font-size: 0.85rem;
+  margin-top: -4px;
+}
+
+.confirmation-calcul {
+  margin-top: 14px;
+  padding: 10px 12px;
+  background: var(--surface-2);
+  border-radius: 10px;
+  font-size: 0.9rem;
+}
+
+/* ---------- Analyse OCR d'une photo d'étiquette ---------- */
+.ocr-consigne {
+  color: var(--texte-doux);
+  font-size: 0.9rem;
+  margin-top: 0;
+}
+
+.ocr-etat {
+  font-size: 0.9rem;
+  text-align: center;
+  min-height: 1.2em;
+  margin: 14px 0 6px;
+}
+
+.ocr-barre-piste {
+  background: var(--surface-2);
+  border-radius: 999px;
+  height: 10px;
+  overflow: hidden;
+}
+
+.ocr-barre-remplissage {
+  height: 100%;
+  width: 0%;
+  background: var(--accent);
+  border-radius: 999px;
+  transition: width var(--duree);
+}
+
+.ocr-erreur { margin-top: 14px; }
+.ocr-erreur p {
+  background: var(--danger-fond);
+  border: 1px solid var(--bord);
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 0.9rem;
+  margin: 0;
+}
+
+/* ---------- Vue Tendances (Phase 6) ---------- */
+.vue-tendances {
+  padding: 16px;
+  max-width: 640px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+.vue-tendances h2 {
+  margin: 4px 0 0;
+  font-size: 1.1rem;
+}
+
+.tendances-resume {
+  color: var(--texte-doux);
+  font-size: 0.9rem;
+  margin: 4px 0 20px;
+}
+
+.graphique-tendances {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 8px;
+  height: 200px;
+  background: var(--surface);
+  border: 1px solid var(--bord);
+  border-radius: var(--rayon);
+  padding: 16px 12px 10px;
+}
+
+.colonne-tendance {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  height: 100%;
+}
+
+.piste-tendance {
+  position: relative;
+  width: 100%;
+  max-width: 34px;
+  flex: 1;
+  background: var(--surface-2);
+  border-radius: 6px;
+  overflow: visible;
+}
+
+.barre-tendance {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  min-height: 3px;
+  background: var(--accent);
+  border-radius: 6px 6px 0 0;
+  transition: height var(--duree);
+}
+
+.barre-tendance.depassement { background: var(--danger); }
+
+.ligne-objectif {
+  position: absolute;
+  left: -3px;
+  right: -3px;
+  height: 0;
+  border-top: 2px dashed var(--texte-doux);
+}
+
+.etiquette-jour {
+  font-size: 0.75rem;
+  color: var(--texte-doux);
+  text-transform: capitalize;
+}
+
+.colonne-tendance.aujourdhui .etiquette-jour {
+  color: var(--texte);
+  font-weight: 700;
+}
+
+.tendances-legende {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin: 14px 4px 0;
+  font-size: 0.8rem;
+  color: var(--texte-doux);
+}
+
+.legende-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.legende-puce {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  display: inline-block;
+}
+
+.legende-puce.puce-normale { background: var(--accent); }
+.legende-puce.puce-depassement { background: var(--danger); }
+
+.legende-trait {
+  width: 14px;
+  height: 0;
+  border-top: 2px dashed var(--texte-doux);
+  display: inline-block;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition-duration: 0ms !important; }
+}
