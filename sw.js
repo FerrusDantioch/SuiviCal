@@ -4,7 +4,7 @@
    ce fichier ne met en cache que les requêtes same-origin (type 'basic'),
    donc les appels API cross-origin ne sont jamais interceptés ici. */
 
-const CACHE = 'suivi-calorique-v6';
+const CACHE = 'suivi-calorique-v7';
 
 // Fichiers mis en cache dès l'installation (l'app shell : tout ce dont
 // l'app a besoin pour démarrer hors connexion). Le moteur OCR
@@ -28,10 +28,14 @@ const FICHIERS = [
   './maskable-512.png'
 ];
 
+// { cache: 'reload' } : chaque fichier est repris sur le serveur, sans
+// passer par le petit cache du navigateur (GitHub Pages le garde 10 min).
+// Sinon, deux mises à jour publiées coup sur coup pourraient ranger
+// d'anciens fichiers sous le nouveau numéro de version.
 self.addEventListener('install', (e) => {
   e.waitUntil(
     caches.open(CACHE)
-      .then((c) => c.addAll(FICHIERS))
+      .then((c) => c.addAll(FICHIERS.map((f) => new Request(f, { cache: 'reload' }))))
       .then(() => self.skipWaiting())
   );
 });
@@ -46,6 +50,9 @@ self.addEventListener('activate', (e) => {
 
 self.addEventListener('fetch', (e) => {
   if (e.request.method !== 'GET') return;
+  // Les appels vers d'autres sites (Open Food Facts) passent directement
+  // par le réseau, sans détour par ce fichier.
+  if (new URL(e.request.url).origin !== self.location.origin) return;
   e.respondWith(
     caches.match(e.request).then((enCache) => {
       const surLeReseau = fetch(e.request)
