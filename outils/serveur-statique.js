@@ -5,7 +5,7 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 
-const racine = process.argv[2] || '.';
+const racine = path.resolve(process.argv[2] || '.');
 const port = parseInt(process.argv[3], 10) || 8080;
 
 const typesMime = {
@@ -18,9 +18,26 @@ const typesMime = {
 };
 
 http.createServer((req, res) => {
-    let chemin = decodeURIComponent(req.url.split('?')[0]);
+    let chemin;
+    try {
+        chemin = decodeURIComponent(req.url.split('?')[0]);
+    } catch (e) {
+        // Adresse mal formée (« %E0 » seul, par exemple) : on refuse
+        // poliment au lieu de laisser le serveur s'arrêter net.
+        res.writeHead(400);
+        res.end('Adresse invalide');
+        return;
+    }
     if (chemin === '/') chemin = '/index.html';
     const fichier = path.join(racine, chemin);
+
+    // Sécurité : une adresse du genre « /../../mes-documents » ne doit
+    // jamais permettre de lire un fichier en dehors du dossier servi.
+    if (fichier !== racine && !fichier.startsWith(racine + path.sep)) {
+        res.writeHead(403);
+        res.end('Accès refusé');
+        return;
+    }
 
     fs.readFile(fichier, (err, data) => {
         if (err) {

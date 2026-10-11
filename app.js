@@ -365,10 +365,18 @@ function remplirUneBarre({ valeurActuelle, valeurObjectif, unite, elementValeurs
   elementRemplissage.classList.toggle('depassement', objectifDepasse);
 }
 
+// Neutralise les caractères spéciaux du HTML avant d'insérer un texte
+// dans la page. Les guillemets sont traités aussi : le nom d'un produit
+// (qui peut venir d'Open Food Facts, une base ouverte à tous) est également
+// placé dans un attribut (aria-label="…"), où un guillemet pourrait sinon
+// fermer l'attribut et y faire entrer du code.
 function echapper(texte) {
-  const d = document.createElement('div');
-  d.textContent = texte;
-  return d.innerHTML;
+  return String(texte)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 
 conteneur.addEventListener('click', async (e) => {
@@ -608,6 +616,7 @@ const dialogueChoix = $('#dialogue-choix-ajout');
 // l'aliment. `repasCible` (déclaré section 8) est réutilisé par les
 // trois chemins possibles (scanner, photo, manuel).
 function ouvrirChoixAjout(repasId) {
+  suivreChangementDeJour(); // l'écran est peut-être resté allumé après minuit
   repasCible = repasId;
   dialogueChoix.showModal();
 }
@@ -751,6 +760,16 @@ dialogueScanner.addEventListener('close', () => arreterLectureCodeBarres());
 
 const URL_OPEN_FOOD_FACTS = 'https://world.openfoodfacts.org/api/v2/product/';
 
+// Certaines fiches n'indiquent l'énergie qu'en kilojoules (kJ). Plutôt que
+// d'afficher 0 kcal (qu'on risquerait de valider sans le voir), on convertit :
+// 1 kcal = 4,184 kJ. "energy_100g" est lui aussi exprimé en kJ.
+function caloriesDepuisNutriments(n) {
+  const kcal = Number(n['energy-kcal_100g']);
+  if (n['energy-kcal_100g'] != null && Number.isFinite(kcal)) return kcal;
+  const kj = Number(n['energy-kj_100g'] ?? n['energy_100g']);
+  return Number.isFinite(kj) && kj > 0 ? Math.round(kj / 4.184) : 0;
+}
+
 // Recherche un produit à partir de son code-barres :
 // 1. D'abord dans le cache local (magasin "produits"), pour éviter
 //    une requête réseau si ce produit a déjà été scanné auparavant.
@@ -770,6 +789,9 @@ async function rechercherProduit(codeBarres) {
   } catch {
     throw { type: 'reseau' };
   }
+  // L'API v2 répond par une erreur 404 quand le code-barres est inconnu :
+  // c'est un produit introuvable, pas un problème de connexion.
+  if (reponse.status === 404) throw { type: 'non-trouve' };
   if (!reponse.ok) throw { type: 'reseau' };
 
   const donnees = await reponse.json();
@@ -782,11 +804,12 @@ async function rechercherProduit(codeBarres) {
   const n = p.nutriments || {};
   const produit = {
     codeBarres,
-    nom: p.product_name || p.product_name_fr || 'Produit sans nom',
+    // Le nom en français d'abord, quand il existe.
+    nom: p.product_name_fr || p.product_name || 'Produit sans nom',
     // Certains produits n'ont pas toutes leurs valeurs renseignées sur
     // Open Food Facts (base communautaire) : 0 par défaut, mais reste
     // modifiable par l'utilisateur à l'écran de confirmation.
-    caloriesPour100g: n['energy-kcal_100g'] ?? 0,
+    caloriesPour100g: caloriesDepuisNutriments(n),
     proteinesPour100g: n['proteins_100g'] ?? 0,
     glucidesPour100g: n['carbohydrates_100g'] ?? 0,
     lipidesPour100g: n['fat_100g'] ?? 0,
@@ -1367,6 +1390,26 @@ function changerJour(delta) {
   jourAffiche = dateISO(d);
   rafraichirEcran();
 }
+
+// Une application installée peut rester ouverte en arrière-plan pendant
+// des heures. Si on la quitte le soir sur « Aujourd'hui » et qu'on y
+// revient le lendemain matin, il faut passer au nouveau jour : sinon le
+// petit-déjeuner serait ajouté au journal de la veille.
+let dernierAujourdhui = dateISO(new Date());
+
+function suivreChangementDeJour() {
+  const maintenant = dateISO(new Date());
+  if (maintenant === dernierAujourdhui) return;
+  if (jourAffiche === dernierAujourdhui) jourAffiche = maintenant;
+  dernierAujourdhui = maintenant;
+  champDate.max = maintenant;
+  rafraichirEcran();
+  if (!vueTendances.hidden) rafraichirTendances();
+}
+
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') suivreChangementDeJour();
+});
 
 $('#btn-jour-prec').addEventListener('click', () => changerJour(-1));
 $('#btn-jour-suiv').addEventListener('click', () => changerJour(1));
