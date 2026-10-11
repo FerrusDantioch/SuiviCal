@@ -98,9 +98,10 @@ réflexe.
 
 Contrairement à Refuge (100 % hors-ligne), cette app a une fonctionnalité
 dépendante d'internet depuis la Phase 3 (recherche par code-barres sur
-Open Food Facts). Le service worker ne met en cache que les requêtes
-same-origin (réponses de type `basic`) : les appels API cross-origin ne
-seront donc jamais interceptés par erreur.
+Open Food Facts). Le service worker ignore les requêtes vers un autre
+site (test d'origine en tête du gestionnaire `fetch`) et ne met en cache
+que les réponses same-origin (type `basic`) : les appels à l'API passent
+directement par le réseau.
 
 ## Bibliothèque html5-qrcode — copie locale, pas de CDN
 
@@ -193,7 +194,9 @@ Testé en direct sur `https://world.openfoodfacts.org/api/v2/product/{code}.json
 avant l'implémentation (Phase 3) :
 - Produit inconnu → `{ "status": 0 }`, **sans clé `"product"` du tout**
   (pas un objet vide — bien tester `!donnees.product` en plus de
-  `status === 0`).
+  `status === 0`). L'API v2 renvoie ce corps avec un **statut HTTP 404** :
+  `rechercherProduit` traite donc le 404 comme « produit introuvable »
+  (et non comme une erreur de connexion) avant le test `reponse.ok`.
 - Les valeurs nutritionnelles vivent dans `product.nutriments`, avec des
   noms de clés qui ne correspondent pas tous à des mots français : calories
   `energy-kcal_100g`, protéines `proteins_100g`, glucides
@@ -201,6 +204,13 @@ avant l'implémentation (Phase 3) :
   piège facile). Toutes ces clés peuvent être absentes selon la qualité
   des données communautaires : `rechercherProduit` retombe sur `0` avec
   `??`, l'utilisateur corrige si besoin à l'écran de confirmation.
+  Exception pour les calories (`caloriesDepuisNutriments`) : si seule
+  l'énergie en kJ est fournie (`energy-kj_100g` ou `energy_100g`, tous
+  deux en kJ), elle est convertie (÷ 4,184) plutôt que d'afficher 0 kcal.
+- Nom du produit : `product_name_fr` en priorité, puis `product_name`.
+- Ces noms viennent d'une base ouverte à tous : toujours passer par
+  `echapper()` (qui neutralise aussi les guillemets) avant de les insérer
+  dans du HTML, y compris dans un attribut.
 
 ## Tester en local
 
