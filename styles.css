@@ -701,6 +701,36 @@ main {
   display: inline-block;
 }
 
+/* ---------- À propos (bas de page) ---------- */
+.a-propos {
+  max-width: 640px;
+  width: 100%;
+  margin: 8px auto 0;
+  padding: 16px;
+  font-size: 0.9rem;
+}
+
+.a-propos h2 {
+  margin: 0 0 6px;
+  font-size: 1.1rem;
+}
+
+.a-propos p { margin: 0 0 8px; }
+
+/* Ligne du lien : plus petite et plus discrète que le texte au-dessus. */
+.a-propos-lien {
+  font-size: 0.8rem;
+  color: var(--texte-doux);
+}
+
+/* Le lien garde la couleur du texte autour (juste souligné) ; une adresse
+   trop longue pour un petit écran passe à la ligne au lieu de déborder. */
+.a-propos-lien a {
+  color: inherit;
+  text-underline-offset: 3px;
+  overflow-wrap: anywhere;
+}
+
 @media (prefers-reduced-motion: reduce) {
   * { transition-duration: 0ms !important; }
 }
