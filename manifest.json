@@ -4,6 +4,7 @@
   "description": "Suivi des calories et macronutriments par repas, avec scan code-barres et objectifs quotidiens.",
   "lang": "fr",
   "dir": "ltr",
+  "id": "/SuiviCal/",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
