@@ -4,7 +4,7 @@
    ce fichier ne met en cache que les requêtes same-origin (type 'basic'),
    donc les appels API cross-origin ne sont jamais interceptés ici. */
 
-const CACHE = 'suivi-calorique-v9';
+const CACHE = 'suivi-calorique-v10';
 
 // Fichiers mis en cache dès l'installation (l'app shell : tout ce dont
 // l'app a besoin pour démarrer hors connexion). Le moteur OCR
