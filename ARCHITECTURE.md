@@ -70,7 +70,9 @@ Logique de report : à chaque nouveau jour, si aucun nouvel objectif n'a été d
   proteinesPour100g: 6.3,
   glucidesPour100g: 57.5,
   lipidesPour100g: 30.9,
-  source: "openfoodfacts" | "ocr" | "manuel"
+  source: "openfoodfacts" | "ocr" | "manuel",
+  unite: "g" | "ml",           // Phase 7 : "ml" = valeurs pour 100 ml (liquides)
+  favori: true                  // Phase 7 : absent ou false = pas favori
 }
 ```
 
@@ -83,11 +85,24 @@ Logique de report : à chaque nouveau jour, si aucun nouvel objectif n'a été d
   repas: "petit-dejeuner" | "dejeuner" | "diner" | "collation",
   produitRef: codeBarres ou id produit local,
   nomAffiche: "Nutella",       // dénormalisé pour affichage rapide sans jointure
-  quantiteGrammes: 30,
+  quantiteGrammes: 30,         // décimales possibles (54.4) ; en ml si unite = "ml"
+  unite: "g" | "ml",           // Phase 7
+  // Phase 7 : copie des valeurs pour 100 g (ou 100 ml) au moment de l'ajout,
+  // pour le détail et la modification de quantité
+  caloriesPour100g: 539,
+  proteinesPour100g: 6.3,
+  glucidesPour100g: 57.5,      // null si inconnu (ancienne ligne sans fiche)
+  lipidesPour100g: 30.9,       // null si inconnu
   caloriesCalculees: 161.7,
-  proteinesCalculees: 1.89
+  proteinesCalculees: 1.9,
+  glucidesCalculees: 17.3,     // Phase 7
+  lipidesCalculees: 9.3        // Phase 7
 }
 ```
+
+Les lignes et fiches enregistrées avant la Phase 7 sont complétées
+automatiquement au démarrage (`migrerAnciennesDonnees` dans `app.js`),
+sans jamais modifier leurs calories ni leurs protéines.
 
 ### Store `parametres`
 
@@ -155,6 +170,15 @@ jour), un comportement lecture-seule sur les jours passés, un
 indicateur de dépassement propre à l'historique, et une vue
 "Tendances" séparée (agrégat sur 7 jours, graphique CSS) pour la vue
 d'ensemble que le journal jour-par-jour ne donne pas.
+
+### Phase 7 — Confort de saisie (fait)
+
+* Aliments favoris : étoile sur chaque ligne du journal, liste des favoris en tête de la fenêtre d'ajout
+* Quantités et valeurs à décimales, virgule ou point acceptés
+* Détail d'un aliment du journal : calories et macronutriments pour la quantité consommée
+* Modification de la quantité d'un aliment déjà enregistré (totaux recalculés)
+* Unité g ou ml (liquides : valeurs pour 100 ml)
+* Migration automatique des données existantes
 
 ## 7. Points à trancher en cours de développement
 
