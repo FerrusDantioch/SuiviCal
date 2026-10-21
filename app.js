@@ -324,14 +324,30 @@ async function supprimerAliment(id) {
   await BDD.supprimer('journal', id);
 }
 
-// Change la quantité d'une ligne du journal et recalcule ses valeurs
-// (calories, protéines, glucides, lipides) à partir de ses valeurs pour
-// 100 g. Les totaux du jour, calculés à chaque affichage à partir des
-// lignes, suivent donc d'eux-mêmes.
-async function modifierQuantite(entree, quantite) {
-  entree.quantiteGrammes = quantite;
-  calculerValeursEntree(entree);
+// Modifie la quantité et/ou l'unité d'une ligne du journal.
+// - Nouvelle quantité : ses valeurs (calories, protéines, glucides,
+//   lipides) sont recalculées à partir de ses valeurs pour 100 g. Les
+//   totaux du jour, calculés à chaque affichage à partir des lignes,
+//   suivent donc d'eux-mêmes.
+// - Nouvelle unité : seul le libellé change (les valeurs étaient déjà
+//   données "pour 100" de l'unité voulue) ; elle est aussi retenue sur
+//   la fiche produit, pour être proposée d'office la prochaine fois.
+async function modifierEntree(entree, { quantite, unite }) {
+  if (quantite !== entree.quantiteGrammes) {
+    entree.quantiteGrammes = quantite;
+    calculerValeursEntree(entree);
+  }
+  const uniteChangee = unite !== uniteDe(entree);
+  entree.unite = unite;
   await BDD.remplacer('journal', entree);
+
+  if (uniteChangee) {
+    const produit = await produitDeLEntree(entree);
+    if (produit) {
+      produit.unite = unite;
+      await BDD.remplacer('produits', produit);
+    }
+  }
 }
 
 // Une ligne du journal ne désigne pas sa fiche produit de la même façon
@@ -2006,8 +2022,8 @@ listeFavoris.addEventListener('click', async (e) => {
    ============================================================
    Toucher un aliment du journal (son nom ou ses calories) ouvre une
    fenêtre avec ses calories et macronutriments pour la quantité
-   consommée, à côté des valeurs pour 100 g. La quantité y est
-   modifiable : le tableau se recalcule pendant la frappe, et
+   consommée, à côté des valeurs pour 100 g. La quantité et l'unité
+   (g / ml) y sont modifiables : le tableau suit la saisie, et
    "Enregistrer" met à jour la ligne et les totaux du jour. Comme la
    suppression, la modification reste possible sur un jour passé, pour
    corriger une erreur. */
@@ -2034,7 +2050,7 @@ async function ouvrirDetail(id) {
   $('#detail-nom').textContent = entree.nomAffiche;
   $('#detail-contexte').textContent = `${repas ? repas.label : ''} · ${libelleJour(entree.date)}`;
   champQuantiteDetail.value = nombreVersChamp(entree.quantiteGrammes);
-  afficherUnite(formDetail, uniteDe(entree));
+  appliquerUnite(formDetail, uniteDe(entree));
   afficherTableauNutrition(entree, entree.quantiteGrammes);
 
   if (!dialogueDetail.open) dialogueDetail.showModal();
@@ -2058,8 +2074,9 @@ function valeursPourQuantite(entree, quantite) {
 
 // Remplit le tableau "Pour X g | Pour 100 g". Une valeur inconnue (une
 // ancienne ligne dont la fiche produit est introuvable) est affichée
-// comme telle, jamais remplacée par un 0 trompeur.
-function afficherTableauNutrition(entree, quantite) {
+// comme telle, jamais remplacée par un 0 trompeur. `unite` : celle en
+// cours de choix dans la fenêtre (par défaut, celle de la ligne).
+function afficherTableauNutrition(entree, quantite, unite = uniteDe(entree)) {
   const consomme = valeursPourQuantite(entree, quantite);
   const lignes = [
     { libelle: 'Calories',  consomme: consomme.calories,  pour100g: entree.caloriesPour100g,  unite: 'kcal' },
@@ -2071,7 +2088,7 @@ function afficherTableauNutrition(entree, quantite) {
     ? '<span class="valeur-inconnue">non renseigné</span>'
     : `${formaterNombre(valeur)} ${unite}`);
 
-  $('#detail-entete-quantite').textContent = `Pour ${formaterNombre(quantite, 2)} ${uniteDe(entree)}`;
+  $('#detail-entete-quantite').textContent = `Pour ${formaterNombre(quantite, 2)} ${unite}`;
   $('#detail-lignes').innerHTML = lignes.map((l) => `
     <tr>
       <th scope="row">${l.libelle}</th>
@@ -2085,16 +2102,27 @@ function afficherTableauNutrition(entree, quantite) {
 $('#btn-fermer-detail').addEventListener('click', () => dialogueDetail.close());
 brancherVerificationNombres(formDetail);
 
-// Pendant la frappe : le tableau suit la quantité tapée (tant qu'elle
-// est valide), pour voir l'effet du changement avant de l'enregistrer.
-champQuantiteDetail.addEventListener('input', () => {
-  const quantite = lireNombre(champQuantiteDetail.value);
-  if (entreeEnDetail && quantite > 0) afficherTableauNutrition(entreeEnDetail, quantite);
+// Le tableau et les libellés suivent la saisie en cours : quantité
+// tapée (tant qu'elle est valide, sinon celle enregistrée) et unité
+// cochée, pour voir l'effet du changement avant de l'enregistrer.
+function rafraichirTableauDetail() {
+  if (!entreeEnDetail) return;
+  const quantiteTapee = lireNombre(champQuantiteDetail.value);
+  const quantite = quantiteTapee > 0 ? quantiteTapee : entreeEnDetail.quantiteGrammes;
+  const unite = formDetail.elements.unite.value;
+  afficherUnite(formDetail, unite);
+  afficherTableauNutrition(entreeEnDetail, quantite, unite);
+}
+
+champQuantiteDetail.addEventListener('input', rafraichirTableauDetail);
+formDetail.addEventListener('change', (e) => {
+  if (e.target.name === 'unite') rafraichirTableauDetail();
 });
 
 formDetail.addEventListener('submit', async (e) => {
   const entree = entreeEnDetail; // retenue ici : la fenêtre se ferme tout de suite
   const quantite = lireNombre(champQuantiteDetail.value);
+  const unite = formDetail.elements.unite.value;
 
   if (!entree || !(quantite > 0)) {
     e.preventDefault();
@@ -2102,12 +2130,14 @@ formDetail.addEventListener('submit', async (e) => {
   }
 
   // Quantité inchangée (telle qu'elle était affichée dans le champ) :
-  // la fenêtre se ferme simplement, sans rien recalculer.
-  if (quantite === lireNombre(nombreVersChamp(entree.quantiteGrammes))) return;
+  // on garde la valeur exacte enregistrée, sans rien recalculer.
+  const quantiteInchangee = quantite === lireNombre(nombreVersChamp(entree.quantiteGrammes));
+  // Rien n'a changé : la fenêtre se ferme simplement.
+  if (quantiteInchangee && unite === uniteDe(entree)) return;
 
-  await modifierQuantite(entree, quantite);
+  await modifierEntree(entree, { quantite: quantiteInchangee ? entree.quantiteGrammes : quantite, unite });
   await rafraichirEcran();
-  annoncer(`${entree.nomAffiche} : quantité modifiée (${formaterNombre(quantite, 2)} ${uniteDe(entree)}).`);
+  annoncer(`${entree.nomAffiche} : ${formaterNombre(entree.quantiteGrammes, 2)} ${unite} enregistrés.`);
 });
 
 
@@ -2119,7 +2149,8 @@ formDetail.addEventListener('submit', async (e) => {
    même qu'en grammes, l'unité ne change que les libellés. Elle est
    choisie dans les fenêtres d'ajout (manuel, confirmation), enregistrée
    sur la fiche produit (proposée d'office la fois suivante) et sur
-   chaque ligne du journal. */
+   chaque ligne du journal, et reste modifiable ensuite dans le détail
+   d'un aliment (section 19, qui gère ses propres libellés). */
 
 // Unité d'une fiche ou d'une ligne. Tout ce qui n'est pas explicitement
 // en "ml" est en grammes : c'est le cas des données d'avant la Phase 7.

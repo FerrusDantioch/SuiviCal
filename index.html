@@ -317,6 +317,16 @@
     <h2 id="detail-nom" tabindex="-1" autofocus>Aliment</h2>
     <p id="detail-contexte" class="confirmation-origine"></p>
 
+    <!-- Unité modifiable après coup : ne change que le libellé (les
+         valeurs étaient déjà "pour 100" de l'unité voulue). -->
+    <fieldset class="choix-unite">
+      <legend>Unité</legend>
+      <div class="options-unite">
+        <label><input type="radio" name="unite" value="g" checked><span>Grammes (g)</span></label>
+        <label><input type="radio" name="unite" value="ml"><span>Millilitres (ml)</span></label>
+      </div>
+    </fieldset>
+
     <label for="d-quantite">Quantité consommée (<span data-unite>g</span>)</label>
     <input type="text" id="d-quantite" name="quantite" required inputmode="decimal" autocomplete="off" data-nombre="quantite">
 

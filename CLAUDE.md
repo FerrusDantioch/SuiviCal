@@ -73,7 +73,9 @@ scanner, découpage en phases).
   d'un aliment en touchant sa ligne (calories, protéines, glucides,
   lipides pour la quantité consommée, section 19) ; modification de la
   quantité dans ce même détail, aussi sur un jour passé ; unité g ou ml
-  pour les liquides (section 20).
+  pour les liquides (section 20), modifiable après coup dans le détail
+  (`modifierEntree` : ne change que le libellé, et retient la nouvelle
+  unité sur la fiche produit).
 - Prochaines étapes (hors périmètre technique) : décision de mise en
   vente, choix de plateforme de distribution, politique de
   confidentialité, visuels de fiche produit.
