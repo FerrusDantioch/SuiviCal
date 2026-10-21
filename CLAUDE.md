@@ -257,6 +257,14 @@ avant l'implémentation (Phase 3) :
   l'énergie en kJ est fournie (`energy-kj_100g` ou `energy_100g`, tous
   deux en kJ), elle est convertie (÷ 4,184) plutôt que d'afficher 0 kcal.
 - Nom du produit : `product_name_fr` en priorité, puis `product_name`.
+- Unité (Phase 7, `uniteDepuisOpenFoodFacts`) : `product_quantity_unit`
+  vaut `"g"` ou `"ml"` (déduit du texte `quantity`, ex. « 6 x 250 ml »),
+  et les valeurs `_100g` d'une boisson s'entendent pour 100 ml. Vérifié
+  dans la documentation officielle (schéma « Product » de Product
+  Opener), **pas** par un appel en direct : l'API était inaccessible
+  depuis l'environnement de développement. À confirmer en scannant une
+  canette ; en cas d'absence du champ, repli sur le texte `quantity`
+  puis sur « g ».
 - Ces noms viennent d'une base ouverte à tous : toujours passer par
   `echapper()` (qui neutralise aussi les guillemets) avant de les insérer
   dans du HTML, y compris dans un attribut.

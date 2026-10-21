@@ -1054,9 +1054,11 @@ function caloriesDepuisNutriments(n) {
 // toujours changer). Deux indices : l'unité de la contenance
 // (`product_quantity_unit`, "ml" pour une boisson) ou, à défaut, la
 // contenance écrite sur l'emballage (`quantity`, ex. "33 cl", "1,5 L").
-// Ces deux champs n'ont pas pu être vérifiés en direct (API inaccessible
-// pendant le développement de la Phase 7) : s'ils sont absents, on
-// retombe simplement sur "g", comme avant.
+// Noms et valeurs vérifiés dans la documentation officielle (schéma
+// "Product" d'Open Food Facts : `product_quantity_unit` vaut "g" ou
+// "ml", déduit de `quantity`), mais pas par un essai en direct (API
+// inaccessible pendant le développement de la Phase 7). S'ils sont
+// absents, on retombe simplement sur "g", comme avant.
 function uniteDepuisOpenFoodFacts(p) {
   if (String(p.product_quantity_unit || '').toLowerCase() === 'ml') return 'ml';
   return /\d\s*(ml|cl|dl|l|litres?)\b/i.test(String(p.quantity || '')) ? 'ml' : 'g';
