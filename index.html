@@ -150,11 +150,22 @@
     <label for="f-nom">Nom de l'aliment</label>
     <input type="text" id="f-nom" name="nom" required autocomplete="off">
 
-    <label for="f-quantite">Quantité consommée (g)</label>
+    <!-- Unité (Phase 7) : un liquide se mesure en ml, avec des valeurs
+         "pour 100 ml" (comme sur l'étiquette). Les libellés marqués
+         data-unite suivent le choix (app.js, section 20). -->
+    <fieldset class="choix-unite">
+      <legend>Unité</legend>
+      <div class="options-unite">
+        <label><input type="radio" name="unite" value="g" checked><span>Grammes (g)</span></label>
+        <label><input type="radio" name="unite" value="ml"><span>Millilitres (ml)</span></label>
+      </div>
+    </fieldset>
+
+    <label for="f-quantite">Quantité consommée (<span data-unite>g</span>)</label>
     <input type="text" id="f-quantite" name="quantite" required inputmode="decimal" autocomplete="off" data-nombre="quantite" placeholder="ex. 54,4">
 
     <fieldset>
-      <legend>Valeurs nutritionnelles pour 100 g</legend>
+      <legend>Valeurs nutritionnelles pour 100 <span data-unite>g</span></legend>
 
       <label for="f-calories">Calories (kcal)</label>
       <input type="text" id="f-calories" name="calories" autocomplete="off" data-nombre="valeur" required inputmode="decimal">
@@ -245,8 +256,19 @@
     <label for="c-nom">Nom du produit</label>
     <input type="text" id="c-nom" name="nom" required autocomplete="off">
 
+    <!-- Unité (Phase 7) : un liquide se mesure en ml, avec des valeurs
+         "pour 100 ml" (comme sur l'étiquette). Les libellés marqués
+         data-unite suivent le choix (app.js, section 20). -->
+    <fieldset class="choix-unite">
+      <legend>Unité</legend>
+      <div class="options-unite">
+        <label><input type="radio" name="unite" value="g" checked><span>Grammes (g)</span></label>
+        <label><input type="radio" name="unite" value="ml"><span>Millilitres (ml)</span></label>
+      </div>
+    </fieldset>
+
     <fieldset>
-      <legend>Valeurs nutritionnelles pour 100 g</legend>
+      <legend>Valeurs nutritionnelles pour 100 <span data-unite>g</span></legend>
 
       <label for="c-calories">Calories (kcal)</label>
       <input type="text" id="c-calories" name="calories" autocomplete="off" data-nombre="valeur" required inputmode="decimal">
@@ -261,7 +283,7 @@
       <input type="text" id="c-lipides" name="lipides" autocomplete="off" data-nombre="valeur" inputmode="decimal">
     </fieldset>
 
-    <label for="c-quantite">Quantité consommée (g)</label>
+    <label for="c-quantite">Quantité consommée (<span data-unite>g</span>)</label>
     <input type="text" id="c-quantite" name="quantite" required inputmode="decimal" autocomplete="off" data-nombre="quantite" value="100">
 
     <label for="c-repas">Repas</label>
@@ -295,7 +317,7 @@
     <h2 id="detail-nom" tabindex="-1" autofocus>Aliment</h2>
     <p id="detail-contexte" class="confirmation-origine"></p>
 
-    <label for="d-quantite">Quantité consommée (g)</label>
+    <label for="d-quantite">Quantité consommée (<span data-unite>g</span>)</label>
     <input type="text" id="d-quantite" name="quantite" required inputmode="decimal" autocomplete="off" data-nombre="quantite">
 
     <table class="tableau-nutrition">
@@ -303,7 +325,7 @@
         <tr>
           <th scope="col">Nutriment</th>
           <th scope="col" id="detail-entete-quantite">Pour 100 g</th>
-          <th scope="col">Pour 100 g</th>
+          <th scope="col">Pour 100 <span data-unite>g</span></th>
         </tr>
       </thead>
       <tbody id="detail-lignes"></tbody>

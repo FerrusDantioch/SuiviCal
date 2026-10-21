@@ -24,7 +24,8 @@
    quantités et valeurs à décimales, avec virgule ou point ; détail
    d'un aliment du journal (calories, protéines, glucides, lipides pour
    la quantité consommée), avec migration des anciennes lignes ;
-   modification de la quantité d'un aliment déjà enregistré.
+   modification de la quantité d'un aliment déjà enregistré ;
+   unité au choix, grammes ou millilitres (liquides).
    ============================================================ */
 
 'use strict';
@@ -101,7 +102,7 @@ const BDD = {
 
 
 /* ============================================================
-   2. REPAS — constantes et utilitaires de date
+   2. REPAS — constantes, utilitaires de date et de nombres
    ============================================================ */
 
 const REPAS = [
@@ -232,13 +233,21 @@ function calculerValeursEntree(entree) {
 // 100 g (en plus des valeurs calculées) : le détail d'un aliment et la
 // modification de sa quantité se calculent à partir de cette copie, et
 // restent donc justes même si la fiche produit est corrigée plus tard.
-function nouvelleEntree({ repas, produitRef, nom, quantite, calories, proteines, glucides, lipides }) {
+//
+// Liquides : avec `unite: 'ml'`, les valeurs "pour 100 g" sont en fait
+// pour 100 ml (comme sur l'étiquette d'une boisson) et la quantité est
+// en ml. Le calcul est exactement le même ; seuls les libellés changent.
+// Le champ `quantiteGrammes` garde son nom d'origine (le renommer
+// obligerait à convertir toutes les données existantes) mais contient
+// donc des millilitres pour une ligne en ml.
+function nouvelleEntree({ repas, produitRef, nom, quantite, unite, calories, proteines, glucides, lipides }) {
   return calculerValeursEntree({
     date: jourAffiche,
     repas,
     produitRef,
     nomAffiche: nom,
     quantiteGrammes: quantite,
+    unite,
     caloriesPour100g: calories,
     proteinesPour100g: proteines,
     glucidesPour100g: glucides,
@@ -246,7 +255,7 @@ function nouvelleEntree({ repas, produitRef, nom, quantite, calories, proteines,
   });
 }
 
-async function ajouterAliment({ nom, quantite, calories, proteines, glucides, lipides, repas, source = 'manuel' }) {
+async function ajouterAliment({ nom, quantite, unite = 'g', calories, proteines, glucides, lipides, repas, source = 'manuel' }) {
   const produit = {
     codeBarres: null,
     nom,
@@ -254,6 +263,7 @@ async function ajouterAliment({ nom, quantite, calories, proteines, glucides, li
     proteinesPour100g: proteines || 0,
     glucidesPour100g: glucides || 0,
     lipidesPour100g: lipides || 0,
+    unite,
     source
   };
   const idProduit = await BDD.ajouter('produits', produit);
@@ -263,6 +273,7 @@ async function ajouterAliment({ nom, quantite, calories, proteines, glucides, li
     produitRef: idProduit,
     nom,
     quantite,
+    unite,
     calories,
     proteines: produit.proteinesPour100g,
     glucides: produit.glucidesPour100g,
@@ -321,18 +332,30 @@ function indexerProduits(produits) {
 }
 
 
-/* ---- Migration des lignes enregistrées avant la Phase 7 ----
-   Avant la Phase 7, une ligne du journal ne gardait que ses calories
-   et ses protéines déjà calculées ; les glucides et lipides pour 100 g
-   n'étaient enregistrés que sur la fiche produit. Au démarrage,
-   `migrerAnciennesEntrees` complète une fois pour toutes ces anciennes
-   lignes (on les reconnaît à l'absence de `caloriesPour100g`). Les
-   calories et protéines déjà enregistrées ne sont JAMAIS modifiées :
-   les totaux des jours passés restent exactement les mêmes. */
+/* ---- Migration des données enregistrées avant la Phase 7 ----
+   Avant la Phase 7 :
+   - une ligne du journal ne gardait que ses calories et ses protéines
+     déjà calculées ; les glucides et lipides pour 100 g n'étaient
+     enregistrés que sur la fiche produit ;
+   - tout était en grammes : ni les lignes ni les fiches n'avaient de
+     champ `unite`.
+   Au démarrage, `migrerAnciennesDonnees` complète une fois pour toutes
+   ces anciennes lignes et fiches. Les calories et protéines déjà
+   enregistrées ne sont JAMAIS modifiées : les totaux des jours passés
+   restent exactement les mêmes. */
+
+// Une ligne est "ancienne" s'il lui manque un des champs de la Phase 7.
+function estAncienneEntree(entree) {
+  return entree.caloriesPour100g === undefined || entree.unite === undefined;
+}
 
 // Complète une ancienne ligne à partir de sa fiche produit (`produit`
 // peut valoir null si la fiche est introuvable).
 function completerAncienneEntree(entree, produit) {
+  // Avant la Phase 7, une quantité était toujours en grammes.
+  if (entree.unite === undefined) entree.unite = 'g';
+  if (entree.caloriesPour100g !== undefined) return entree;
+
   const quantite = entree.quantiteGrammes;
 
   // Retrouve une valeur pour 100 g à partir de la valeur calculée de la
@@ -362,17 +385,29 @@ function completerAncienneEntree(entree, produit) {
   return entree;
 }
 
-// Complète toutes les anciennes lignes, en une seule transaction.
-// Sans effet (et rapide) quand tout est déjà à jour. Renvoie le nombre
-// de lignes complétées.
-async function migrerAnciennesEntrees() {
-  const aCompleter = (await BDD.tout('journal')).filter((e) => e.caloriesPour100g === undefined);
-  if (aCompleter.length === 0) return 0;
+// Complète toutes les anciennes lignes et fiches (une transaction par
+// magasin). Sans effet (et rapide) quand tout est déjà à jour. Renvoie
+// le nombre d'enregistrements complétés.
+async function migrerAnciennesDonnees() {
+  const produits = await BDD.tout('produits');
 
-  const produitDe = indexerProduits(await BDD.tout('produits'));
-  aCompleter.forEach((e) => completerAncienneEntree(e, produitDe(e)));
-  await BDD.remplacerPlusieurs('journal', aCompleter);
-  return aCompleter.length;
+  // Lignes du journal (avant les fiches : on se sert ici des fiches
+  // telles qu'elles étaient, ce qui ne change rien au résultat).
+  const lignesACompleter = (await BDD.tout('journal')).filter(estAncienneEntree);
+  if (lignesACompleter.length > 0) {
+    const produitDe = indexerProduits(produits);
+    lignesACompleter.forEach((e) => completerAncienneEntree(e, produitDe(e)));
+    await BDD.remplacerPlusieurs('journal', lignesACompleter);
+  }
+
+  // Fiches produits : unité "g" pour toutes celles d'avant la Phase 7.
+  const fichesACompleter = produits.filter((p) => p.unite === undefined);
+  if (fichesACompleter.length > 0) {
+    fichesACompleter.forEach((p) => { p.unite = 'g'; });
+    await BDD.remplacerPlusieurs('produits', fichesACompleter);
+  }
+
+  return lignesACompleter.length + fichesACompleter.length;
 }
 
 // Lit une ligne du journal en s'assurant qu'elle est au format actuel.
@@ -382,7 +417,7 @@ async function migrerAnciennesEntrees() {
 async function lireEntreeComplete(id) {
   const entree = await BDD.unePar('journal', id);
   if (!entree) return null;
-  if (entree.caloriesPour100g === undefined) {
+  if (estAncienneEntree(entree)) {
     completerAncienneEntree(entree, await produitDeLEntree(entree));
     await BDD.remplacer('journal', entree);
   }
@@ -514,7 +549,7 @@ async function rafraichirEcran() {
         <button type="button" class="btn-detail" data-id="${e.id}" title="Voir le détail ou modifier la quantité">
           <span class="info">
             <span class="nom">${echapper(e.nomAffiche)}</span>
-            <span class="detail">${formaterNombre(e.quantiteGrammes, 2)} g</span>
+            <span class="detail">${formaterNombre(e.quantiteGrammes, 2)} ${uniteDe(e)}</span>
           </span>
           <span class="kcal">${Math.round(e.caloriesCalculees)} kcal</span>
         </button>
@@ -809,6 +844,7 @@ function ouvrirDialogueAjout(repasId) {
   const repas = REPAS.find((r) => r.id === repasId);
   $('#dialogue-titre').textContent = `Ajouter à : ${repas.label}`;
   formAjout.reset();
+  appliquerUnite(formAjout, 'g');
   dialogue.showModal();
   $('#f-nom').focus();
 }
@@ -831,6 +867,7 @@ formAjout.addEventListener('submit', async (e) => {
   await ajouterAliment({
     nom,
     quantite,
+    unite: formAjout.elements.unite.value,
     calories,
     // Champs facultatifs : vides (NaN) → 0.
     proteines: lireNombre($('#f-proteines').value) || 0,
@@ -1012,6 +1049,19 @@ function caloriesDepuisNutriments(n) {
   return Number.isFinite(kj) && kj > 0 ? Math.round(kj / 4.184) : 0;
 }
 
+// Devine si un produit d'Open Food Facts est un liquide, pour proposer
+// "ml" d'office à l'écran de confirmation (où l'utilisateur peut
+// toujours changer). Deux indices : l'unité de la contenance
+// (`product_quantity_unit`, "ml" pour une boisson) ou, à défaut, la
+// contenance écrite sur l'emballage (`quantity`, ex. "33 cl", "1,5 L").
+// Ces deux champs n'ont pas pu être vérifiés en direct (API inaccessible
+// pendant le développement de la Phase 7) : s'ils sont absents, on
+// retombe simplement sur "g", comme avant.
+function uniteDepuisOpenFoodFacts(p) {
+  if (String(p.product_quantity_unit || '').toLowerCase() === 'ml') return 'ml';
+  return /\d\s*(ml|cl|dl|l|litres?)\b/i.test(String(p.quantity || '')) ? 'ml' : 'g';
+}
+
 // Recherche un produit à partir de son code-barres :
 // 1. D'abord dans le cache local (magasin "produits"), pour éviter
 //    une requête réseau si ce produit a déjà été scanné auparavant.
@@ -1055,6 +1105,7 @@ async function rechercherProduit(codeBarres) {
     proteinesPour100g: n['proteins_100g'] ?? 0,
     glucidesPour100g: n['carbohydrates_100g'] ?? 0,
     lipidesPour100g: n['fat_100g'] ?? 0,
+    unite: uniteDepuisOpenFoodFacts(p),
     source: 'openfoodfacts'
   };
 
@@ -1118,6 +1169,7 @@ function ouvrirConfirmation(produit, origine) {
   $('#c-lipides').value = nombreVersChamp(produit.lipidesPour100g);
   $('#c-quantite').value = 100;
   $('#c-repas').value = repasCible;
+  appliquerUnite(formConfirmation, uniteDe(produit));
 
   mettreAJourCalculConfirmation();
   dialogueConfirmation.showModal();
@@ -1151,14 +1203,15 @@ brancherVerificationNombres(formConfirmation);
 // erronée à l'écran de confirmation. Le reste de la fiche (code-barres,
 // origine, marque "favori") est recopié tel quel grâce à `...produit` :
 // sans cela, valider un produit lui ferait perdre sa place dans les favoris.
-async function ajouterAlimentConnu({ produit, nom, quantite, calories, proteines, glucides, lipides, repas }) {
+async function ajouterAlimentConnu({ produit, nom, quantite, unite, calories, proteines, glucides, lipides, repas }) {
   await BDD.remplacer('produits', {
     ...produit,
     nom,
     caloriesPour100g: calories,
     proteinesPour100g: proteines,
     glucidesPour100g: glucides,
-    lipidesPour100g: lipides
+    lipidesPour100g: lipides,
+    unite
   });
 
   await BDD.ajouter('journal', nouvelleEntree({
@@ -1169,6 +1222,7 @@ async function ajouterAlimentConnu({ produit, nom, quantite, calories, proteines
     produitRef: produit.codeBarres ?? produit.id,
     nom,
     quantite,
+    unite,
     calories,
     proteines,
     glucides,
@@ -1193,6 +1247,7 @@ formConfirmation.addEventListener('submit', async (e) => {
     proteines: lireNombre($('#c-proteines').value) || 0,
     glucides: lireNombre($('#c-glucides').value) || 0,
     lipides: lireNombre($('#c-lipides').value) || 0,
+    unite: formConfirmation.elements.unite.value,
     repas: $('#c-repas').value
   };
 
@@ -1343,7 +1398,7 @@ async function analyserPhotoEtiquette(fichier) {
     }
 
     dialogueOcr.close();
-    ouvrirConfirmationOcr(valeurs);
+    ouvrirConfirmationOcr(valeurs, uniteDepuisTexteEtiquette(data.text || ''));
   } catch (erreur) {
     if (!dialogueOcr.open) return; // annulé entre-temps
 
@@ -1364,7 +1419,7 @@ async function analyserPhotoEtiquette(fichier) {
 // deviné à partir du texte brut de l'étiquette serait peu fiable (ce
 // n'est presque jamais la première ligne lisible), mieux vaut le faire
 // saisir par l'utilisateur que proposer une valeur hasardeuse.
-function ouvrirConfirmationOcr(valeurs) {
+function ouvrirConfirmationOcr(valeurs, unite) {
   produitEnConfirmation = null;
 
   $('#confirmation-origine').textContent = 'Valeurs lues automatiquement sur la photo — à vérifier avant de valider';
@@ -1376,6 +1431,7 @@ function ouvrirConfirmationOcr(valeurs) {
   $('#c-lipides').value = nombreVersChamp(valeurs.lipides);
   $('#c-quantite').value = 100;
   $('#c-repas').value = repasCible;
+  appliquerUnite(formConfirmation, unite);
 
   mettreAJourCalculConfirmation();
   dialogueConfirmation.showModal();
@@ -1472,6 +1528,14 @@ function chercherCalories(texteBrut, lignes) {
   if (correspondanceKcal) return Number(correspondanceKcal[1].replace(',', '.'));
 
   return chercherValeur(lignes, MOTS_CLES_NUTRIMENTS.calories);
+}
+
+// Une étiquette de boisson donne ses valeurs "pour 100 ml" : si cette
+// mention est lue sur la photo, l'écran de confirmation propose "ml"
+// d'office (Phase 7). L'OCR sépare parfois les lettres ("100 m l"),
+// d'où les espaces facultatifs.
+function uniteDepuisTexteEtiquette(texteBrut) {
+  return /100\s*m\s*l\b/i.test(texteBrut) ? 'ml' : 'g';
 }
 
 // Point d'entrée : analyse le texte brut renvoyé par Tesseract et tente
@@ -1811,7 +1875,7 @@ async function afficherFavoris() {
     <li class="ligne-favori">
       <button type="button" class="btn-choisir-favori" data-id="${p.id}">
         <span class="nom">${echapper(p.nom)}</span>
-        <span class="detail">${formaterNombre(p.caloriesPour100g)} kcal / 100 g</span>
+        <span class="detail">${formaterNombre(p.caloriesPour100g)} kcal / 100 ${uniteDe(p)}</span>
       </button>
       <button type="button" class="btn-retirer-favori" data-id="${p.id}"
               aria-label="Retirer ${echapper(p.nom)} des favoris" title="Retirer des favoris">★</button>
@@ -1880,6 +1944,7 @@ async function ouvrirDetail(id) {
   $('#detail-nom').textContent = entree.nomAffiche;
   $('#detail-contexte').textContent = `${repas ? repas.label : ''} · ${libelleJour(entree.date)}`;
   champQuantiteDetail.value = nombreVersChamp(entree.quantiteGrammes);
+  afficherUnite(formDetail, uniteDe(entree));
   afficherTableauNutrition(entree, entree.quantiteGrammes);
 
   if (!dialogueDetail.open) dialogueDetail.showModal();
@@ -1916,7 +1981,7 @@ function afficherTableauNutrition(entree, quantite) {
     ? '<span class="valeur-inconnue">non renseigné</span>'
     : `${formaterNombre(valeur)} ${unite}`);
 
-  $('#detail-entete-quantite').textContent = `Pour ${formaterNombre(quantite, 2)} g`;
+  $('#detail-entete-quantite').textContent = `Pour ${formaterNombre(quantite, 2)} ${uniteDe(entree)}`;
   $('#detail-lignes').innerHTML = lignes.map((l) => `
     <tr>
       <th scope="row">${l.libelle}</th>
@@ -1952,12 +2017,49 @@ formDetail.addEventListener('submit', async (e) => {
 
   await modifierQuantite(entree, quantite);
   await rafraichirEcran();
-  annoncer(`${entree.nomAffiche} : quantité modifiée (${formaterNombre(quantite, 2)} g).`);
+  annoncer(`${entree.nomAffiche} : quantité modifiée (${formaterNombre(quantite, 2)} ${uniteDe(entree)}).`);
 });
 
 
 /* ============================================================
-   20. DÉMARRAGE
+   20. UNITÉ — grammes ou millilitres
+   ============================================================
+   Un liquide se mesure en ml, et son étiquette donne ses valeurs
+   "pour 100 ml" : le calcul (valeur pour 100 × quantité / 100) est le
+   même qu'en grammes, l'unité ne change que les libellés. Elle est
+   choisie dans les fenêtres d'ajout (manuel, confirmation), enregistrée
+   sur la fiche produit (proposée d'office la fois suivante) et sur
+   chaque ligne du journal. */
+
+// Unité d'une fiche ou d'une ligne. Tout ce qui n'est pas explicitement
+// en "ml" est en grammes : c'est le cas des données d'avant la Phase 7.
+function uniteDe(objet) {
+  return objet && objet.unite === 'ml' ? 'ml' : 'g';
+}
+
+// Remplace "g" par "ml" (ou l'inverse) dans les libellés d'un
+// formulaire : chaque emplacement est un <span data-unite>.
+function afficherUnite(formulaire, unite) {
+  formulaire.querySelectorAll('[data-unite]').forEach((el) => { el.textContent = unite; });
+}
+
+// Coche le bouton d'unité voulu dans un formulaire et met les libellés
+// à jour en conséquence.
+function appliquerUnite(formulaire, unite) {
+  formulaire.elements.unite.value = unite;
+  afficherUnite(formulaire, unite);
+}
+
+// Quand l'utilisateur change lui-même d'unité, les libellés suivent.
+[formAjout, formConfirmation].forEach((formulaire) => {
+  formulaire.addEventListener('change', (e) => {
+    if (e.target.name === 'unite') afficherUnite(formulaire, e.target.value);
+  });
+});
+
+
+/* ============================================================
+   21. DÉMARRAGE
    ============================================================ */
 
 async function demarrer() {
@@ -1969,7 +2071,7 @@ async function demarrer() {
   // jour. Un échec ne doit pas empêcher l'application de s'ouvrir : la
   // fenêtre de détail sait aussi compléter une ligne à la demande.
   try {
-    await migrerAnciennesEntrees();
+    await migrerAnciennesDonnees();
   } catch (erreur) {
     console.warn('Migration des anciennes lignes du journal impossible :', erreur);
   }
