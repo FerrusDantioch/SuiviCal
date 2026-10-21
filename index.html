@@ -151,22 +151,22 @@
     <input type="text" id="f-nom" name="nom" required autocomplete="off">
 
     <label for="f-quantite">Quantité consommée (g)</label>
-    <input type="number" id="f-quantite" name="quantite" min="1" step="1" required inputmode="decimal">
+    <input type="text" id="f-quantite" name="quantite" required inputmode="decimal" autocomplete="off" data-nombre="quantite" placeholder="ex. 54,4">
 
     <fieldset>
       <legend>Valeurs nutritionnelles pour 100 g</legend>
 
       <label for="f-calories">Calories (kcal)</label>
-      <input type="number" id="f-calories" name="calories" min="0" step="0.1" required inputmode="decimal">
+      <input type="text" id="f-calories" name="calories" autocomplete="off" data-nombre="valeur" required inputmode="decimal">
 
       <label for="f-proteines">Protéines (g)</label>
-      <input type="number" id="f-proteines" name="proteines" min="0" step="0.1" inputmode="decimal">
+      <input type="text" id="f-proteines" name="proteines" autocomplete="off" data-nombre="valeur" inputmode="decimal">
 
       <label for="f-glucides">Glucides (g)</label>
-      <input type="number" id="f-glucides" name="glucides" min="0" step="0.1" inputmode="decimal">
+      <input type="text" id="f-glucides" name="glucides" autocomplete="off" data-nombre="valeur" inputmode="decimal">
 
       <label for="f-lipides">Lipides (g)</label>
-      <input type="number" id="f-lipides" name="lipides" min="0" step="0.1" inputmode="decimal">
+      <input type="text" id="f-lipides" name="lipides" autocomplete="off" data-nombre="valeur" inputmode="decimal">
     </fieldset>
 
     <div class="dialogue-actions">
@@ -249,20 +249,20 @@
       <legend>Valeurs nutritionnelles pour 100 g</legend>
 
       <label for="c-calories">Calories (kcal)</label>
-      <input type="number" id="c-calories" name="calories" min="0" step="0.1" required inputmode="decimal">
+      <input type="text" id="c-calories" name="calories" autocomplete="off" data-nombre="valeur" required inputmode="decimal">
 
       <label for="c-proteines">Protéines (g)</label>
-      <input type="number" id="c-proteines" name="proteines" min="0" step="0.1" inputmode="decimal">
+      <input type="text" id="c-proteines" name="proteines" autocomplete="off" data-nombre="valeur" inputmode="decimal">
 
       <label for="c-glucides">Glucides (g)</label>
-      <input type="number" id="c-glucides" name="glucides" min="0" step="0.1" inputmode="decimal">
+      <input type="text" id="c-glucides" name="glucides" autocomplete="off" data-nombre="valeur" inputmode="decimal">
 
       <label for="c-lipides">Lipides (g)</label>
-      <input type="number" id="c-lipides" name="lipides" min="0" step="0.1" inputmode="decimal">
+      <input type="text" id="c-lipides" name="lipides" autocomplete="off" data-nombre="valeur" inputmode="decimal">
     </fieldset>
 
     <label for="c-quantite">Quantité consommée (g)</label>
-    <input type="number" id="c-quantite" name="quantite" min="1" step="1" required inputmode="decimal" value="100">
+    <input type="text" id="c-quantite" name="quantite" required inputmode="decimal" autocomplete="off" data-nombre="quantite" value="100">
 
     <label for="c-repas">Repas</label>
     <select id="c-repas" name="repas">

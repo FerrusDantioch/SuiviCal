@@ -20,7 +20,8 @@
    passés en lecture seule (suppression toujours possible), vue
    "Tendances" avec graphique CSS des 7 derniers jours.
    Phase 7 (confort de saisie) : aliments favoris (étoile sur chaque
-   ligne du journal, liste des favoris dans la fenêtre d'ajout).
+   ligne du journal, liste des favoris dans la fenêtre d'ajout) ;
+   quantités et valeurs à décimales, avec virgule ou point.
    ============================================================ */
 
 'use strict';
@@ -122,6 +123,73 @@ function libelleJour(iso) {
 }
 
 let jourAffiche = dateISO(new Date());
+
+
+/* ---- Nombres à virgule (Phase 7) ----
+   Les champs de quantité et de valeurs nutritionnelles sont des champs
+   TEXTE (avec clavier numérique, `inputmode="decimal"`) plutôt que des
+   champs `type="number"` : ces derniers refusent ou vident la saisie
+   selon que le clavier du téléphone propose la virgule ou le point.
+   On lit donc nous-mêmes le texte tapé, en acceptant les deux. */
+
+// Transforme le texte tapé en nombre : "54,4", "54.4", " 54,4 " → 54.4.
+// Renvoie NaN ("pas un nombre") pour une saisie invalide ("abc",
+// "5,4,4", "-3"…). Un champ vide n'est pas un nombre non plus : c'est à
+// l'appelant de décider s'il vaut 0 (champ facultatif) ou s'il manque.
+function lireNombre(texte) {
+  const nettoye = String(texte).replace(/\s/g, '').replace(',', '.');
+  if (!/^(\d+\.?\d*|\.\d+)$/.test(nettoye)) return NaN;
+  return Number(nettoye);
+}
+
+// Écrit un nombre à la française pour l'affichage : 54.4 → "54,4".
+// `decimalesMax` limite le nombre de chiffres après la virgule.
+function formaterNombre(nombre, decimalesMax = 1) {
+  return Number(nombre).toLocaleString('fr-FR', { maximumFractionDigits: decimalesMax });
+}
+
+// Prépare un nombre pour le placer dans un champ de saisie : virgule
+// française, sans espace des milliers (qui gênerait la relecture), et
+// champ vide pour une valeur inconnue (null).
+function nombreVersChamp(nombre) {
+  if (nombre === null || nombre === undefined || nombre === '') return '';
+  return String(Math.round(Number(nombre) * 100) / 100).replace('.', ',');
+}
+
+// Vérifie les champs portant `data-nombre` d'un formulaire et leur
+// attache le message d'erreur que le navigateur affichera (en bulle) au
+// moment de valider. `data-nombre="quantite"` : nombre strictement
+// positif ; `data-nombre="valeur"` : nombre positif ou nul. Un champ
+// vide est laissé à l'attribut `required` (obligatoire ou non).
+function verifierChampsNombres(formulaire) {
+  formulaire.querySelectorAll('input[data-nombre]').forEach((champ) => {
+    let message = '';
+    if (champ.value.trim() !== '') {
+      const nombre = lireNombre(champ.value);
+      if (Number.isNaN(nombre)) {
+        message = 'Saisissez un nombre, par exemple 54,4 (avec une virgule ou un point).';
+      } else if (champ.dataset.nombre === 'quantite' && nombre <= 0) {
+        message = 'La quantité doit être supérieure à 0.';
+      }
+    }
+    champ.setCustomValidity(message);
+  });
+}
+
+// À brancher une fois par formulaire. La vérification se fait au clic
+// sur le bouton de validation : le navigateur lance ce clic AVANT de
+// contrôler le formulaire, les messages sont donc toujours à jour (y
+// compris quand un champ a été pré-rempli par le code). La touche
+// Entrée dans un champ déclenche elle aussi ce clic.
+function brancherVerificationNombres(formulaire) {
+  formulaire.querySelector('button[type="submit"]')
+    .addEventListener('click', () => verifierChampsNombres(formulaire));
+  // Pendant la frappe, on efface l'erreur affichée : elle sera
+  // recalculée au prochain essai de validation.
+  formulaire.addEventListener('input', (e) => {
+    if (e.target.matches('input[data-nombre]')) e.target.setCustomValidity('');
+  });
+}
 
 
 /* ============================================================
@@ -320,7 +388,7 @@ async function rafraichirEcran() {
         ${htmlBoutonFavori(e, produitDe(e))}
         <div class="info">
           <div class="nom">${echapper(e.nomAffiche)}</div>
-          <div class="detail">${e.quantiteGrammes} g</div>
+          <div class="detail">${formaterNombre(e.quantiteGrammes, 2)} g</div>
         </div>
         <span class="kcal">${Math.round(e.caloriesCalculees)} kcal</span>
         <button type="button" class="btn-supprimer" data-id="${e.id}" aria-label="Supprimer ${echapper(e.nomAffiche)}">✕</button>
@@ -619,13 +687,16 @@ function ouvrirDialogueAjout(repasId) {
 }
 
 $('#btn-annuler-ajout').addEventListener('click', () => dialogue.close());
+brancherVerificationNombres(formAjout);
 
 formAjout.addEventListener('submit', async (e) => {
   const nom = $('#f-nom').value.trim();
-  const quantite = Number($('#f-quantite').value);
-  const calories = Number($('#f-calories').value);
+  const quantite = lireNombre($('#f-quantite').value);
+  const calories = lireNombre($('#f-calories').value);
 
-  if (!nom || !quantite || Number.isNaN(calories)) {
+  // Filet de sécurité : `verifierChampsNombres` a normalement déjà
+  // bloqué ces cas avec un message clair.
+  if (!nom || !(quantite > 0) || Number.isNaN(calories)) {
     e.preventDefault();
     return;
   }
@@ -634,9 +705,10 @@ formAjout.addEventListener('submit', async (e) => {
     nom,
     quantite,
     calories,
-    proteines: Number($('#f-proteines').value) || 0,
-    glucides: Number($('#f-glucides').value) || 0,
-    lipides: Number($('#f-lipides').value) || 0,
+    // Champs facultatifs : vides (NaN) → 0.
+    proteines: lireNombre($('#f-proteines').value) || 0,
+    glucides: lireNombre($('#f-glucides').value) || 0,
+    lipides: lireNombre($('#f-lipides').value) || 0,
     repas: repasCible
   });
 
@@ -913,10 +985,10 @@ function ouvrirConfirmation(produit, origine) {
   $('#confirmation-origine').textContent = origine;
 
   $('#c-nom').value = produit.nom;
-  $('#c-calories').value = produit.caloriesPour100g;
-  $('#c-proteines').value = produit.proteinesPour100g;
-  $('#c-glucides').value = produit.glucidesPour100g;
-  $('#c-lipides').value = produit.lipidesPour100g;
+  $('#c-calories').value = nombreVersChamp(produit.caloriesPour100g);
+  $('#c-proteines').value = nombreVersChamp(produit.proteinesPour100g);
+  $('#c-glucides').value = nombreVersChamp(produit.glucidesPour100g);
+  $('#c-lipides').value = nombreVersChamp(produit.lipidesPour100g);
   $('#c-quantite').value = 100;
   $('#c-repas').value = repasCible;
 
@@ -929,15 +1001,15 @@ function ouvrirConfirmation(produit, origine) {
 // frappe, à partir des valeurs pour 100 g actuellement dans le
 // formulaire (elles peuvent avoir été corrigées par l'utilisateur).
 function mettreAJourCalculConfirmation() {
-  const quantite = Number($('#c-quantite').value) || 0;
-  const calories = Number($('#c-calories').value) || 0;
-  const proteines = Number($('#c-proteines').value) || 0;
+  const quantite = lireNombre($('#c-quantite').value) || 0;
+  const calories = lireNombre($('#c-calories').value) || 0;
+  const proteines = lireNombre($('#c-proteines').value) || 0;
 
   const caloriesCalculees = Math.round((calories * quantite) / 100 * 10) / 10;
   const proteinesCalculees = Math.round((proteines * quantite) / 100 * 10) / 10;
 
-  $('#confirmation-calories-calc').textContent = `${caloriesCalculees} kcal`;
-  $('#confirmation-proteines-calc').textContent = `${proteinesCalculees} g`;
+  $('#confirmation-calories-calc').textContent = `${formaterNombre(caloriesCalculees)} kcal`;
+  $('#confirmation-proteines-calc').textContent = `${formaterNombre(proteinesCalculees)} g`;
 }
 
 ['c-quantite', 'c-calories', 'c-proteines'].forEach((id) => {
@@ -945,6 +1017,7 @@ function mettreAJourCalculConfirmation() {
 });
 
 $('#btn-annuler-confirmation').addEventListener('click', () => dialogueConfirmation.close());
+brancherVerificationNombres(formConfirmation);
 
 // Ajoute au journal un aliment dont la fiche existe déjà : produit
 // identifié via le scanner, ou choisi dans les favoris. Contrairement
@@ -981,10 +1054,10 @@ async function ajouterAlimentConnu({ produit, nom, quantite, calories, proteines
 
 formConfirmation.addEventListener('submit', async (e) => {
   const nom = $('#c-nom').value.trim();
-  const quantite = Number($('#c-quantite').value);
-  const calories = Number($('#c-calories').value);
+  const quantite = lireNombre($('#c-quantite').value);
+  const calories = lireNombre($('#c-calories').value);
 
-  if (!nom || !quantite || Number.isNaN(calories)) {
+  if (!nom || !(quantite > 0) || Number.isNaN(calories)) {
     e.preventDefault();
     return;
   }
@@ -993,9 +1066,9 @@ formConfirmation.addEventListener('submit', async (e) => {
     nom,
     quantite,
     calories,
-    proteines: Number($('#c-proteines').value) || 0,
-    glucides: Number($('#c-glucides').value) || 0,
-    lipides: Number($('#c-lipides').value) || 0,
+    proteines: lireNombre($('#c-proteines').value) || 0,
+    glucides: lireNombre($('#c-glucides').value) || 0,
+    lipides: lireNombre($('#c-lipides').value) || 0,
     repas: $('#c-repas').value
   };
 
@@ -1173,10 +1246,10 @@ function ouvrirConfirmationOcr(valeurs) {
   $('#confirmation-origine').textContent = 'Valeurs lues automatiquement sur la photo — à vérifier avant de valider';
 
   $('#c-nom').value = '';
-  $('#c-calories').value = valeurs.calories ?? '';
-  $('#c-proteines').value = valeurs.proteines ?? '';
-  $('#c-glucides').value = valeurs.glucides ?? '';
-  $('#c-lipides').value = valeurs.lipides ?? '';
+  $('#c-calories').value = nombreVersChamp(valeurs.calories);
+  $('#c-proteines').value = nombreVersChamp(valeurs.proteines);
+  $('#c-glucides').value = nombreVersChamp(valeurs.glucides);
+  $('#c-lipides').value = nombreVersChamp(valeurs.lipides);
   $('#c-quantite').value = 100;
   $('#c-repas').value = repasCible;
 
@@ -1614,7 +1687,7 @@ async function afficherFavoris() {
     <li class="ligne-favori">
       <button type="button" class="btn-choisir-favori" data-id="${p.id}">
         <span class="nom">${echapper(p.nom)}</span>
-        <span class="detail">${Math.round(p.caloriesPour100g)} kcal / 100 g</span>
+        <span class="detail">${formaterNombre(p.caloriesPour100g)} kcal / 100 g</span>
       </button>
       <button type="button" class="btn-retirer-favori" data-id="${p.id}"
               aria-label="Retirer ${echapper(p.nom)} des favoris" title="Retirer des favoris">★</button>
