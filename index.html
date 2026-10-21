@@ -150,23 +150,34 @@
     <label for="f-nom">Nom de l'aliment</label>
     <input type="text" id="f-nom" name="nom" required autocomplete="off">
 
-    <label for="f-quantite">Quantité consommée (g)</label>
-    <input type="number" id="f-quantite" name="quantite" min="1" step="1" required inputmode="decimal">
+    <!-- Unité (Phase 7) : un liquide se mesure en ml, avec des valeurs
+         "pour 100 ml" (comme sur l'étiquette). Les libellés marqués
+         data-unite suivent le choix (app.js, section 20). -->
+    <fieldset class="choix-unite">
+      <legend>Unité</legend>
+      <div class="options-unite">
+        <label><input type="radio" name="unite" value="g" checked><span>Grammes (g)</span></label>
+        <label><input type="radio" name="unite" value="ml"><span>Millilitres (ml)</span></label>
+      </div>
+    </fieldset>
+
+    <label for="f-quantite">Quantité consommée (<span data-unite>g</span>)</label>
+    <input type="text" id="f-quantite" name="quantite" required inputmode="decimal" autocomplete="off" data-nombre="quantite" placeholder="ex. 54,4">
 
     <fieldset>
-      <legend>Valeurs nutritionnelles pour 100 g</legend>
+      <legend>Valeurs nutritionnelles pour 100 <span data-unite>g</span></legend>
 
       <label for="f-calories">Calories (kcal)</label>
-      <input type="number" id="f-calories" name="calories" min="0" step="0.1" required inputmode="decimal">
+      <input type="text" id="f-calories" name="calories" autocomplete="off" data-nombre="valeur" required inputmode="decimal">
 
       <label for="f-proteines">Protéines (g)</label>
-      <input type="number" id="f-proteines" name="proteines" min="0" step="0.1" inputmode="decimal">
+      <input type="text" id="f-proteines" name="proteines" autocomplete="off" data-nombre="valeur" inputmode="decimal">
 
       <label for="f-glucides">Glucides (g)</label>
-      <input type="number" id="f-glucides" name="glucides" min="0" step="0.1" inputmode="decimal">
+      <input type="text" id="f-glucides" name="glucides" autocomplete="off" data-nombre="valeur" inputmode="decimal">
 
       <label for="f-lipides">Lipides (g)</label>
-      <input type="number" id="f-lipides" name="lipides" min="0" step="0.1" inputmode="decimal">
+      <input type="text" id="f-lipides" name="lipides" autocomplete="off" data-nombre="valeur" inputmode="decimal">
     </fieldset>
 
     <div class="dialogue-actions">
@@ -179,6 +190,18 @@
 <!-- ====== Choix du mode d'ajout : scanner, photo de l'étiquette ou saisie manuelle ====== -->
 <dialog id="dialogue-choix-ajout" class="boite-dialogue">
   <h2>Ajouter un aliment</h2>
+
+  <!-- Favoris : liste remplie par app.js (section 18) à chaque ouverture.
+       Toucher un nom ouvre l'écran de confirmation, déjà pré-rempli. -->
+  <section class="favoris" aria-labelledby="titre-favoris">
+    <h3 id="titre-favoris" class="titre-choix"><span aria-hidden="true">★</span> Favoris</h3>
+    <ul id="liste-favoris" class="liste-favoris"></ul>
+    <p id="favoris-vide" class="favoris-vide" hidden>
+      Aucun favori pour l'instant. Touchez l'étoile ☆ à côté d'un aliment du journal pour le retrouver ici.
+    </p>
+  </section>
+
+  <h3 class="titre-choix">Nouvel aliment</h3>
   <div class="choix-ajout">
     <button type="button" id="btn-choix-scanner" class="bouton-choix">
       <span class="choix-icone" aria-hidden="true">📷</span>
@@ -233,24 +256,35 @@
     <label for="c-nom">Nom du produit</label>
     <input type="text" id="c-nom" name="nom" required autocomplete="off">
 
-    <fieldset>
-      <legend>Valeurs nutritionnelles pour 100 g</legend>
-
-      <label for="c-calories">Calories (kcal)</label>
-      <input type="number" id="c-calories" name="calories" min="0" step="0.1" required inputmode="decimal">
-
-      <label for="c-proteines">Protéines (g)</label>
-      <input type="number" id="c-proteines" name="proteines" min="0" step="0.1" inputmode="decimal">
-
-      <label for="c-glucides">Glucides (g)</label>
-      <input type="number" id="c-glucides" name="glucides" min="0" step="0.1" inputmode="decimal">
-
-      <label for="c-lipides">Lipides (g)</label>
-      <input type="number" id="c-lipides" name="lipides" min="0" step="0.1" inputmode="decimal">
+    <!-- Unité (Phase 7) : un liquide se mesure en ml, avec des valeurs
+         "pour 100 ml" (comme sur l'étiquette). Les libellés marqués
+         data-unite suivent le choix (app.js, section 20). -->
+    <fieldset class="choix-unite">
+      <legend>Unité</legend>
+      <div class="options-unite">
+        <label><input type="radio" name="unite" value="g" checked><span>Grammes (g)</span></label>
+        <label><input type="radio" name="unite" value="ml"><span>Millilitres (ml)</span></label>
+      </div>
     </fieldset>
 
-    <label for="c-quantite">Quantité consommée (g)</label>
-    <input type="number" id="c-quantite" name="quantite" min="1" step="1" required inputmode="decimal" value="100">
+    <fieldset>
+      <legend>Valeurs nutritionnelles pour 100 <span data-unite>g</span></legend>
+
+      <label for="c-calories">Calories (kcal)</label>
+      <input type="text" id="c-calories" name="calories" autocomplete="off" data-nombre="valeur" required inputmode="decimal">
+
+      <label for="c-proteines">Protéines (g)</label>
+      <input type="text" id="c-proteines" name="proteines" autocomplete="off" data-nombre="valeur" inputmode="decimal">
+
+      <label for="c-glucides">Glucides (g)</label>
+      <input type="text" id="c-glucides" name="glucides" autocomplete="off" data-nombre="valeur" inputmode="decimal">
+
+      <label for="c-lipides">Lipides (g)</label>
+      <input type="text" id="c-lipides" name="lipides" autocomplete="off" data-nombre="valeur" inputmode="decimal">
+    </fieldset>
+
+    <label for="c-quantite">Quantité consommée (<span data-unite>g</span>)</label>
+    <input type="text" id="c-quantite" name="quantite" required inputmode="decimal" autocomplete="off" data-nombre="quantite" value="100">
 
     <label for="c-repas">Repas</label>
     <select id="c-repas" name="repas">
@@ -268,6 +302,51 @@
     <div class="dialogue-actions">
       <button type="button" id="btn-annuler-confirmation" class="bouton-secondaire">Annuler</button>
       <button type="submit" class="bouton-principal">Ajouter au journal</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- ====== Détail d'un aliment du journal (Phase 7) ======
+     Ouvert en touchant un aliment du journal ; tableau rempli par
+     app.js (section 19), qui le recalcule pendant qu'on modifie la quantité. -->
+<dialog id="dialogue-detail" class="boite-dialogue" aria-labelledby="detail-nom">
+  <form id="form-detail" class="formulaire" method="dialog">
+    <!-- `autofocus` sur le titre : à l'ouverture, le curseur va sur le
+         titre et non dans le champ quantité, pour que le clavier du
+         téléphone ne surgisse pas en cachant le tableau. -->
+    <h2 id="detail-nom" tabindex="-1" autofocus>Aliment</h2>
+    <p id="detail-contexte" class="confirmation-origine"></p>
+
+    <!-- Unité modifiable après coup : ne change que le libellé (les
+         valeurs étaient déjà "pour 100" de l'unité voulue). -->
+    <fieldset class="choix-unite">
+      <legend>Unité</legend>
+      <div class="options-unite">
+        <label><input type="radio" name="unite" value="g" checked><span>Grammes (g)</span></label>
+        <label><input type="radio" name="unite" value="ml"><span>Millilitres (ml)</span></label>
+      </div>
+    </fieldset>
+
+    <label for="d-quantite">Quantité consommée (<span data-unite>g</span>)</label>
+    <input type="text" id="d-quantite" name="quantite" required inputmode="decimal" autocomplete="off" data-nombre="quantite">
+
+    <table class="tableau-nutrition">
+      <thead>
+        <tr>
+          <th scope="col">Nutriment</th>
+          <th scope="col" id="detail-entete-quantite">Pour 100 g</th>
+          <th scope="col">Pour 100 <span data-unite>g</span></th>
+        </tr>
+      </thead>
+      <tbody id="detail-lignes"></tbody>
+    </table>
+    <p id="detail-valeurs-inconnues" class="detail-note" hidden>
+      Cet aliment a été enregistré par une ancienne version de l'application et sa fiche produit est introuvable : ses glucides et lipides ne sont pas connus.
+    </p>
+
+    <div class="dialogue-actions">
+      <button type="button" id="btn-fermer-detail" class="bouton-secondaire">Fermer</button>
+      <button type="submit" class="bouton-principal">Enregistrer</button>
     </div>
   </form>
 </dialog>

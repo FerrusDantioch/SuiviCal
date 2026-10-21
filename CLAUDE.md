@@ -25,7 +25,8 @@ scanner, découpage en phases).
   puis Open Food Facts (`rechercherProduit` dans `app.js`), avec trois
   messages d'erreur distincts (caméra refusée/indisponible, pas de
   connexion, produit introuvable). Écran de confirmation modifiable
-  (`ouvrirConfirmation`) avant ajout au journal via `ajouterAlimentScanne`.
+  (`ouvrirConfirmation`) avant ajout au journal via `ajouterAlimentConnu`
+  (nommée `ajouterAlimentScanne` jusqu'à la Phase 7).
 - **Phase 4 (OCR étiquette) — fait** : bouton "Photo de l'étiquette"
   activé dans le choix d'ajout (Phase 3), capture via
   `<input type="file" capture="environment">` (photo fixe, pas de flux
@@ -64,6 +65,17 @@ scanner, découpage en phases).
   visuelle trouvées en relisant les phases précédentes (voir plus bas :
   contraste du bandeau, couleur des erreurs scanner/OCR). Icône
   maskable régénérée (débordait de la zone de sécurité Android).
+- **Phase 7 (confort de saisie) — fait** : cinq ajouts, un commit
+  chacun (voir plus bas « Format des données depuis la Phase 7 ») :
+  favoris (étoile ☆/★ sur chaque ligne du journal, liste en tête de la
+  fenêtre « Ajouter un aliment », section 18) ; quantités et valeurs à
+  décimales avec virgule ou point (`lireNombre`, section 2) ; détail
+  d'un aliment en touchant sa ligne (calories, protéines, glucides,
+  lipides pour la quantité consommée, section 19) ; modification de la
+  quantité dans ce même détail, aussi sur un jour passé ; unité g ou ml
+  pour les liquides (section 20), modifiable après coup dans le détail
+  (`modifierEntree` : ne change que le libellé, et retient la nouvelle
+  unité sur la fiche produit).
 - Prochaines étapes (hors périmètre technique) : décision de mise en
   vente, choix de plateforme de distribution, politique de
   confidentialité, visuels de fiche produit.
@@ -82,6 +94,54 @@ Sans ce changement, le navigateur ne retélécharge rien et toute personne
 ayant déjà ouvert l'application continue de voir l'ancienne version. En cas
 d'**ajout de fichier**, l'inscrire aussi dans la liste `FICHIERS` du même
 fichier.
+
+## Format des données depuis la Phase 7 (migration automatique)
+
+- **Ligne du journal** : en plus de `caloriesCalculees` /
+  `proteinesCalculees`, elle garde une copie de ses valeurs pour 100 g
+  (`caloriesPour100g`, `proteinesPour100g`, `glucidesPour100g`,
+  `lipidesPour100g`), ses `glucidesCalculees` / `lipidesCalculees` et
+  son `unite` (`'g'` ou `'ml'`). Toujours la construire avec
+  `nouvelleEntree` et la recalculer avec `calculerValeursEntree` (qui
+  arrondit au dixième, comme avant).
+- **Fiche produit** : champs `favori` (absent = pas favori) et `unite`.
+- **`quantiteGrammes` contient des ml** pour une ligne en ml : le nom
+  est resté pour ne pas convertir les données existantes. Une boisson
+  donne ses valeurs pour 100 ml, le calcul est donc le même.
+- **`produitRef` a deux formes** : code-barres (texte) pour un produit
+  scanné, numéro de fiche (nombre) sinon. `produitDeLEntree` /
+  `indexerProduits` gèrent les deux.
+- **Pas de fiche en double** : une saisie manuelle (ou OCR) réutilise
+  une fiche sans code-barres identique (`ficheIdentique` : même nom aux
+  majuscules/accents/espaces près, même unité, mêmes valeurs pour
+  100 g — voir `empreinteAliment`). Les doublons créés avant la
+  Phase 7 sont fusionnés au démarrage (`fusionnerFichesEnDouble`,
+  appelée par la migration) : fiche favorite gardée en priorité, sinon
+  la plus ancienne ; lignes du journal rattachées, doublons supprimés,
+  en une transaction. Même nom mais valeurs différentes = aliments
+  distincts, volontairement (pain complet / pain blanc).
+- **Migration** (`migrerAnciennesDonnees`, appelée dans `demarrer`) :
+  complète les lignes et fiches d'avant la Phase 7 (repérées par
+  l'absence de `caloriesPour100g` ou d'`unite`), en une transaction par
+  magasin. Elle ne modifie **jamais** les calories et protéines
+  calculées (totaux des jours passés identiques) ; sans fiche
+  retrouvée, glucides et lipides restent `null` (« non renseigné »),
+  jamais 0. Elle est rejouée à chaque démarrage mais ne touche rien
+  quand tout est à jour. Pas de changement de version IndexedDB (aucun
+  magasin ni index ajouté).
+- Testé de bout en bout : ancienne version publiée (cache v10, vraies
+  données saisies) → nouvelle version sur la même adresse ; totaux
+  identiques, cache v10 supprimé.
+
+## Champs décimaux : texte + `lireNombre`, pas `type="number"`
+
+Les champs de quantité et de valeurs pour 100 g sont des
+`<input type="text" inputmode="decimal" data-nombre="quantite|valeur">`.
+Un `type="number"` refusait 54,4 (`step="1"`) et gère mal la virgule
+selon le clavier Android. `lireNombre` accepte « 54,4 » et « 54.4 » ;
+`brancherVerificationNombres(formulaire)` affiche un message en
+français au moment de valider. Pour pré-remplir un champ, passer par
+`nombreVersChamp` (virgule) ; pour afficher, par `formaterNombre`.
 
 ## ⚠️ Piège CSS : `display` sur un élément qui bascule `hidden`
 
@@ -208,6 +268,14 @@ avant l'implémentation (Phase 3) :
   l'énergie en kJ est fournie (`energy-kj_100g` ou `energy_100g`, tous
   deux en kJ), elle est convertie (÷ 4,184) plutôt que d'afficher 0 kcal.
 - Nom du produit : `product_name_fr` en priorité, puis `product_name`.
+- Unité (Phase 7, `uniteDepuisOpenFoodFacts`) : `product_quantity_unit`
+  vaut `"g"` ou `"ml"` (déduit du texte `quantity`, ex. « 6 x 250 ml »),
+  et les valeurs `_100g` d'une boisson s'entendent pour 100 ml. Vérifié
+  dans la documentation officielle (schéma « Product » de Product
+  Opener), **pas** par un appel en direct : l'API était inaccessible
+  depuis l'environnement de développement. À confirmer en scannant une
+  canette ; en cas d'absence du champ, repli sur le texte `quantity`
+  puis sur « g ».
 - Ces noms viennent d'une base ouverte à tous : toujours passer par
   `echapper()` (qui neutralise aussi les guillemets) avant de les insérer
   dans du HTML, y compris dans un attribut.

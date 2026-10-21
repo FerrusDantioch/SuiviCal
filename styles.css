@@ -22,6 +22,9 @@
      un texte blanc fixe manquait de contraste en thème sombre — d'où
      cette variable plutôt qu'une couleur codée en dur. */
   --texte-sur-danger: #2a0a08;
+  /* Étoile des favoris : le doré habituel des étoiles, assez clair pour
+     ressortir sur fond sombre (une version plus foncée en thème clair). */
+  --favori:      #f2c14e;
   --rayon: 14px;
   --duree: 160ms;
 }
@@ -39,6 +42,7 @@
     --danger:      #c0392b;
     --danger-fond: #fbe4e1;
     --texte-sur-danger: #ffffff;
+    --favori:      #a86b00;
   }
 }
 
@@ -278,7 +282,23 @@ main {
   padding: 8px 10px;
 }
 
-.ligne-aliment .info { flex: 1; min-width: 0; }
+/* Nom + quantité + calories forment un seul grand bouton : le toucher
+   ouvre le détail de l'aliment (Phase 7). On lui retire l'allure d'un
+   bouton pour que la ligne garde son aspect d'origine. */
+.btn-detail {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: transparent;
+  padding: 2px 4px;
+  min-height: 40px;
+  text-align: left;
+  border-radius: 8px;
+}
+
+.ligne-aliment .info { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .ligne-aliment .nom { font-weight: 600; overflow-wrap: anywhere; }
 .ligne-aliment .detail { color: var(--texte-doux); font-size: 0.85rem; }
 
@@ -294,6 +314,27 @@ main {
   min-height: 36px;
   padding: 0;
   font-size: 1rem;
+}
+
+/* Étoile "favori", à gauche du nom (loin du ✕ de suppression, pour
+   éviter de supprimer un aliment en voulant le mettre en favori). */
+.btn-favori {
+  background: transparent;
+  color: var(--texte-doux);
+  min-width: 36px;
+  min-height: 36px;
+  padding: 0;
+  font-size: 1.25rem;
+  line-height: 1;
+}
+
+.btn-favori[aria-pressed="true"] { color: var(--favori); }
+
+/* Espace réservé quand la fiche produit est introuvable : garde les
+   noms alignés avec ceux des lignes qui ont une étoile. */
+.btn-favori-vide {
+  width: 36px;
+  flex-shrink: 0;
 }
 
 /* ---------- Pied : barres de progression du jour ---------- */
@@ -428,6 +469,66 @@ main {
   padding: 0 4px;
 }
 
+/* ---------- Choix de l'unité g / ml (Phase 7) ----------
+   Deux boutons radio présentés comme les onglets Journal/Tendances :
+   le rond du bouton radio est masqué (mais reste utilisable au clavier
+   et par les lecteurs d'écran), c'est l'étiquette qui se colore. */
+.formulaire fieldset.choix-unite {
+  border: none;
+  margin: 8px 0 0;
+  padding: 0;
+}
+
+.choix-unite legend {
+  padding: 0;
+  margin-bottom: 4px;
+}
+
+.options-unite {
+  display: flex;
+  gap: 6px;
+  background: var(--surface-2);
+  border-radius: 999px;
+  padding: 4px;
+}
+
+.formulaire .options-unite label {
+  flex: 1;
+  position: relative;
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+.options-unite input {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+  min-height: 0;
+  margin: 0;
+}
+
+.options-unite span {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 36px;
+  border-radius: 999px;
+  color: var(--texte-doux);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.options-unite input:checked + span {
+  background: var(--accent);
+  color: #0b1a0f;
+}
+
+.options-unite input:focus-visible + span {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
 /* ---------- Option "notifications de dépassement" (dialogue objectif) ---------- */
 .option-notifications {
   margin-top: 16px;
@@ -495,6 +596,65 @@ main {
 
 .choix-icone { font-size: 1.3rem; line-height: 1; }
 
+/* ---------- Favoris (fenêtre "Ajouter un aliment") ---------- */
+.titre-choix {
+  margin: 14px 0 6px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--texte-doux);
+}
+
+.titre-choix span { color: var(--favori); }
+
+/* Liste limitée en hauteur : avec beaucoup de favoris, elle défile
+   d'elle-même au lieu de repousser les autres boutons hors de l'écran. */
+.liste-favoris {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 40vh;
+  overflow-y: auto;
+}
+
+.ligne-favori {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--surface-2);
+  border-radius: 10px;
+}
+
+.btn-choisir-favori {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  text-align: left;
+  background: transparent;
+  padding: 8px 12px;
+}
+
+.btn-choisir-favori .nom { font-weight: 600; overflow-wrap: anywhere; }
+.btn-choisir-favori .detail { color: var(--texte-doux); font-size: 0.85rem; }
+
+.btn-retirer-favori {
+  background: transparent;
+  color: var(--favori);
+  min-width: 44px;
+  padding: 0;
+  font-size: 1.25rem;
+}
+
+.favoris-vide {
+  margin: 0;
+  color: var(--texte-doux);
+  font-size: 0.85rem;
+}
+
 /* ---------- Scanner de code-barres ---------- */
 .boite-dialogue-scanner { width: min(92vw, 480px); }
 
@@ -546,6 +706,57 @@ main {
   background: var(--surface-2);
   border-radius: 10px;
   font-size: 0.9rem;
+}
+
+/* ---------- Détail d'un aliment du journal (Phase 7) ---------- */
+/* Le titre reçoit le focus à l'ouverture (voir index.html) : pas de
+   cadre autour, ce n'est pas un élément sur lequel on agit. */
+#detail-nom:focus { outline: none; }
+
+.tableau-nutrition {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 6px;
+  font-size: 0.95rem;
+}
+
+.tableau-nutrition th,
+.tableau-nutrition td {
+  padding: 9px 6px;
+  text-align: right;
+  border-bottom: 1px solid var(--bord);
+}
+
+.tableau-nutrition tbody tr:last-child th,
+.tableau-nutrition tbody tr:last-child td { border-bottom: none; }
+
+/* Première colonne (nom du nutriment) alignée à gauche, les chiffres à droite. */
+.tableau-nutrition th:first-child { text-align: left; }
+
+.tableau-nutrition thead th {
+  color: var(--texte-doux);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.tableau-nutrition tbody th { font-weight: 600; }
+
+/* La colonne "quantité consommée" est celle qui compte : en gras ;
+   la colonne "pour 100 g" sert de repère, plus discrète. */
+.tableau-nutrition td:nth-child(2) { font-weight: 700; }
+.tableau-nutrition td:nth-child(3) { color: var(--texte-doux); }
+
+.valeur-inconnue {
+  color: var(--texte-doux);
+  font-weight: 400;
+  font-style: italic;
+  font-size: 0.85rem;
+}
+
+.detail-note {
+  margin: 10px 0 0;
+  color: var(--texte-doux);
+  font-size: 0.85rem;
 }
 
 /* ---------- Analyse OCR d'une photo d'étiquette ---------- */
