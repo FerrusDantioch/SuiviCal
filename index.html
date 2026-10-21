@@ -284,6 +284,34 @@
   </form>
 </dialog>
 
+<!-- ====== Détail d'un aliment du journal (Phase 7) ======
+     Ouvert en touchant un aliment du journal ; tableau rempli par
+     app.js (section 19). -->
+<dialog id="dialogue-detail" class="boite-dialogue" aria-labelledby="detail-nom">
+  <form id="form-detail" class="formulaire" method="dialog">
+    <h2 id="detail-nom">Aliment</h2>
+    <p id="detail-contexte" class="confirmation-origine"></p>
+
+    <table class="tableau-nutrition">
+      <thead>
+        <tr>
+          <th scope="col">Nutriment</th>
+          <th scope="col" id="detail-entete-quantite">Pour 100 g</th>
+          <th scope="col">Pour 100 g</th>
+        </tr>
+      </thead>
+      <tbody id="detail-lignes"></tbody>
+    </table>
+    <p id="detail-valeurs-inconnues" class="detail-note" hidden>
+      Cet aliment a été enregistré par une ancienne version de l'application et sa fiche produit est introuvable : ses glucides et lipides ne sont pas connus.
+    </p>
+
+    <div class="dialogue-actions">
+      <button type="button" id="btn-fermer-detail" class="bouton-principal">Fermer</button>
+    </div>
+  </form>
+</dialog>
+
 <!-- ====== Analyse OCR d'une photo d'étiquette (Phase 4) ====== -->
 <dialog id="dialogue-ocr" class="boite-dialogue">
   <h2>Lecture de l'étiquette</h2>

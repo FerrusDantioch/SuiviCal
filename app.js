@@ -21,7 +21,9 @@
    "Tendances" avec graphique CSS des 7 derniers jours.
    Phase 7 (confort de saisie) : aliments favoris (étoile sur chaque
    ligne du journal, liste des favoris dans la fenêtre d'ajout) ;
-   quantités et valeurs à décimales, avec virgule ou point.
+   quantités et valeurs à décimales, avec virgule ou point ; détail
+   d'un aliment du journal (calories, protéines, glucides, lipides pour
+   la quantité consommée), avec migration des anciennes lignes.
    ============================================================ */
 
 'use strict';
@@ -85,6 +87,11 @@ const BDD = {
   remplacer(magasin, entree) { return BDD.operation(magasin, 'readwrite', (m) => m.put(entree)); },
   supprimer(magasin, id)     { return BDD.operation(magasin, 'readwrite', (m) => m.delete(id)); },
   tout(magasin)              { return BDD.operation(magasin, 'readonly',  (m) => m.getAll()); },
+  // Enregistre plusieurs entrées d'un coup, dans une seule transaction :
+  // soit tout est enregistré, soit rien (utile pour une migration).
+  remplacerPlusieurs(magasin, entrees) {
+    return BDD.operation(magasin, 'readwrite', (m) => { entrees.forEach((e) => m.put(e)); });
+  },
   unePar(magasin, id)        { return BDD.operation(magasin, 'readonly',  (m) => m.get(id)); },
   parIndex(magasin, index, valeur) {
     return BDD.operation(magasin, 'readonly', (m) => m.index(index).getAll(valeur));
@@ -200,6 +207,44 @@ async function entreesDuJour(iso) {
   return BDD.parIndex('journal', 'parDate', iso);
 }
 
+// Calcule une valeur "pour la quantité consommée" à partir de sa valeur
+// pour 100 g, arrondie au dixième (54,4 g à 539 kcal/100 g → 293,2 kcal).
+// Une valeur inconnue (null) reste inconnue.
+function pourQuantite(valeurPour100g, quantite) {
+  if (valeurPour100g === null || valeurPour100g === undefined) return null;
+  return Math.round((valeurPour100g * quantite) / 100 * 10) / 10;
+}
+
+// (Re)calcule les quatre valeurs "consommées" d'une ligne du journal à
+// partir de ses valeurs pour 100 g et de sa quantité.
+function calculerValeursEntree(entree) {
+  const quantite = entree.quantiteGrammes;
+  entree.caloriesCalculees = pourQuantite(entree.caloriesPour100g, quantite);
+  entree.proteinesCalculees = pourQuantite(entree.proteinesPour100g, quantite);
+  entree.glucidesCalculees = pourQuantite(entree.glucidesPour100g, quantite);
+  entree.lipidesCalculees = pourQuantite(entree.lipidesPour100g, quantite);
+  return entree;
+}
+
+// Construit une nouvelle ligne du journal pour le jour affiché.
+// Depuis la Phase 7, chaque ligne garde une COPIE de ses valeurs pour
+// 100 g (en plus des valeurs calculées) : le détail d'un aliment et la
+// modification de sa quantité se calculent à partir de cette copie, et
+// restent donc justes même si la fiche produit est corrigée plus tard.
+function nouvelleEntree({ repas, produitRef, nom, quantite, calories, proteines, glucides, lipides }) {
+  return calculerValeursEntree({
+    date: jourAffiche,
+    repas,
+    produitRef,
+    nomAffiche: nom,
+    quantiteGrammes: quantite,
+    caloriesPour100g: calories,
+    proteinesPour100g: proteines,
+    glucidesPour100g: glucides,
+    lipidesPour100g: lipides
+  });
+}
+
 async function ajouterAliment({ nom, quantite, calories, proteines, glucides, lipides, repas, source = 'manuel' }) {
   const produit = {
     codeBarres: null,
@@ -212,16 +257,16 @@ async function ajouterAliment({ nom, quantite, calories, proteines, glucides, li
   };
   const idProduit = await BDD.ajouter('produits', produit);
 
-  const entree = {
-    date: jourAffiche,
+  await BDD.ajouter('journal', nouvelleEntree({
     repas,
     produitRef: idProduit,
-    nomAffiche: nom,
-    quantiteGrammes: quantite,
-    caloriesCalculees: Math.round((calories * quantite) / 100 * 10) / 10,
-    proteinesCalculees: Math.round(((proteines || 0) * quantite) / 100 * 10) / 10
-  };
-  await BDD.ajouter('journal', entree);
+    nom,
+    quantite,
+    calories,
+    proteines: produit.proteinesPour100g,
+    glucides: produit.glucidesPour100g,
+    lipides: produit.lipidesPour100g
+  }));
 }
 
 async function supprimerAliment(id) {
@@ -262,6 +307,75 @@ function indexerProduits(produits) {
     if (typeof entree.produitRef === 'number') return parNumero.get(entree.produitRef) || null;
     return parCodeBarres.get(entree.produitRef) || null;
   };
+}
+
+
+/* ---- Migration des lignes enregistrées avant la Phase 7 ----
+   Avant la Phase 7, une ligne du journal ne gardait que ses calories
+   et ses protéines déjà calculées ; les glucides et lipides pour 100 g
+   n'étaient enregistrés que sur la fiche produit. Au démarrage,
+   `migrerAnciennesEntrees` complète une fois pour toutes ces anciennes
+   lignes (on les reconnaît à l'absence de `caloriesPour100g`). Les
+   calories et protéines déjà enregistrées ne sont JAMAIS modifiées :
+   les totaux des jours passés restent exactement les mêmes. */
+
+// Complète une ancienne ligne à partir de sa fiche produit (`produit`
+// peut valoir null si la fiche est introuvable).
+function completerAncienneEntree(entree, produit) {
+  const quantite = entree.quantiteGrammes;
+
+  // Retrouve une valeur pour 100 g à partir de la valeur calculée de la
+  // ligne (simple règle de trois), au centième près.
+  const depuisLaLigne = (valeurCalculee) => (quantite > 0
+    ? Math.round(((valeurCalculee || 0) * 100) / quantite * 100) / 100
+    : 0);
+
+  // Calories et protéines : la valeur de la fiche est prise si elle
+  // redonne bien ce que la ligne a enregistré (cas normal). Si la fiche
+  // a été corrigée depuis (ou est introuvable), on se fie à la ligne
+  // elle-même, pour que le détail reste cohérent avec les totaux.
+  const choisir = (valeurFiche, valeurCalculee) => (
+    valeurFiche !== null && valeurFiche !== undefined && pourQuantite(valeurFiche, quantite) === valeurCalculee
+      ? valeurFiche
+      : depuisLaLigne(valeurCalculee)
+  );
+
+  entree.caloriesPour100g = choisir(produit && produit.caloriesPour100g, entree.caloriesCalculees);
+  entree.proteinesPour100g = choisir(produit && produit.proteinesPour100g, entree.proteinesCalculees);
+  // Glucides et lipides n'existent que sur la fiche : sans elle, ils
+  // restent inconnus (null) plutôt qu'inventés.
+  entree.glucidesPour100g = produit ? (produit.glucidesPour100g ?? null) : null;
+  entree.lipidesPour100g = produit ? (produit.lipidesPour100g ?? null) : null;
+  entree.glucidesCalculees = pourQuantite(entree.glucidesPour100g, quantite);
+  entree.lipidesCalculees = pourQuantite(entree.lipidesPour100g, quantite);
+  return entree;
+}
+
+// Complète toutes les anciennes lignes, en une seule transaction.
+// Sans effet (et rapide) quand tout est déjà à jour. Renvoie le nombre
+// de lignes complétées.
+async function migrerAnciennesEntrees() {
+  const aCompleter = (await BDD.tout('journal')).filter((e) => e.caloriesPour100g === undefined);
+  if (aCompleter.length === 0) return 0;
+
+  const produitDe = indexerProduits(await BDD.tout('produits'));
+  aCompleter.forEach((e) => completerAncienneEntree(e, produitDe(e)));
+  await BDD.remplacerPlusieurs('journal', aCompleter);
+  return aCompleter.length;
+}
+
+// Lit une ligne du journal en s'assurant qu'elle est au format actuel.
+// Filet de sécurité : une ligne ajoutée par une ancienne version restée
+// ouverte dans un autre onglet, après la migration du démarrage, est
+// complétée ici au moment où on en a besoin.
+async function lireEntreeComplete(id) {
+  const entree = await BDD.unePar('journal', id);
+  if (!entree) return null;
+  if (entree.caloriesPour100g === undefined) {
+    completerAncienneEntree(entree, await produitDeLEntree(entree));
+    await BDD.remplacer('journal', entree);
+  }
+  return entree;
 }
 
 
@@ -386,11 +500,13 @@ async function rafraichirEcran() {
     liste.innerHTML = entreesRepas.map((e) => `
       <li class="ligne-aliment" data-id="${e.id}">
         ${htmlBoutonFavori(e, produitDe(e))}
-        <div class="info">
-          <div class="nom">${echapper(e.nomAffiche)}</div>
-          <div class="detail">${formaterNombre(e.quantiteGrammes, 2)} g</div>
-        </div>
-        <span class="kcal">${Math.round(e.caloriesCalculees)} kcal</span>
+        <button type="button" class="btn-detail" data-id="${e.id}" title="Voir le détail">
+          <span class="info">
+            <span class="nom">${echapper(e.nomAffiche)}</span>
+            <span class="detail">${formaterNombre(e.quantiteGrammes, 2)} g</span>
+          </span>
+          <span class="kcal">${Math.round(e.caloriesCalculees)} kcal</span>
+        </button>
         <button type="button" class="btn-supprimer" data-id="${e.id}" aria-label="Supprimer ${echapper(e.nomAffiche)}">✕</button>
       </li>
     `).join('');
@@ -1005,11 +1121,8 @@ function mettreAJourCalculConfirmation() {
   const calories = lireNombre($('#c-calories').value) || 0;
   const proteines = lireNombre($('#c-proteines').value) || 0;
 
-  const caloriesCalculees = Math.round((calories * quantite) / 100 * 10) / 10;
-  const proteinesCalculees = Math.round((proteines * quantite) / 100 * 10) / 10;
-
-  $('#confirmation-calories-calc').textContent = `${formaterNombre(caloriesCalculees)} kcal`;
-  $('#confirmation-proteines-calc').textContent = `${formaterNombre(proteinesCalculees)} g`;
+  $('#confirmation-calories-calc').textContent = `${formaterNombre(pourQuantite(calories, quantite))} kcal`;
+  $('#confirmation-proteines-calc').textContent = `${formaterNombre(pourQuantite(proteines, quantite))} g`;
 }
 
 ['c-quantite', 'c-calories', 'c-proteines'].forEach((id) => {
@@ -1037,19 +1150,19 @@ async function ajouterAlimentConnu({ produit, nom, quantite, calories, proteines
     lipidesPour100g: lipides
   });
 
-  const entree = {
-    date: jourAffiche,
+  await BDD.ajouter('journal', nouvelleEntree({
     repas,
     // Un produit scanné reste désigné par son code-barres (comme depuis
     // la Phase 3) ; une fiche sans code-barres (favori saisi à la main
     // ou lu sur une photo) par son numéro.
     produitRef: produit.codeBarres ?? produit.id,
-    nomAffiche: nom,
-    quantiteGrammes: quantite,
-    caloriesCalculees: Math.round((calories * quantite) / 100 * 10) / 10,
-    proteinesCalculees: Math.round((proteines * quantite) / 100 * 10) / 10
-  };
-  await BDD.ajouter('journal', entree);
+    nom,
+    quantite,
+    calories,
+    proteines,
+    glucides,
+    lipides
+  }));
 }
 
 formConfirmation.addEventListener('submit', async (e) => {
@@ -1724,12 +1837,99 @@ listeFavoris.addEventListener('click', async (e) => {
 
 
 /* ============================================================
-   19. DÉMARRAGE
+   19. DÉTAIL D'UN ALIMENT DU JOURNAL
+   ============================================================
+   Toucher un aliment du journal (son nom ou ses calories) ouvre une
+   fenêtre avec ses calories et macronutriments pour la quantité
+   consommée, à côté des valeurs pour 100 g. Disponible aussi pour les
+   jours passés (simple consultation). */
+
+const dialogueDetail = $('#dialogue-detail');
+
+// Ligne du journal affichée dans la fenêtre de détail.
+let entreeEnDetail = null;
+
+conteneur.addEventListener('click', async (e) => {
+  const btn = e.target.closest('.btn-detail');
+  if (!btn) return;
+  await ouvrirDetail(Number(btn.dataset.id));
+});
+
+async function ouvrirDetail(id) {
+  const entree = await lireEntreeComplete(id);
+  if (!entree) return;
+  entreeEnDetail = entree;
+
+  const repas = REPAS.find((r) => r.id === entree.repas);
+  $('#detail-nom').textContent = entree.nomAffiche;
+  $('#detail-contexte').textContent = `${repas ? repas.label : ''} · ${libelleJour(entree.date)}`;
+  afficherTableauNutrition(entree, entree.quantiteGrammes);
+
+  if (!dialogueDetail.open) dialogueDetail.showModal();
+}
+
+// Valeurs "consommées" d'une ligne pour une quantité donnée. Pour la
+// quantité enregistrée, on reprend les valeurs de la ligne elle-même
+// (exactement celles comptées dans les totaux) ; pour une autre
+// quantité, on les recalcule à partir des valeurs pour 100 g.
+function valeursPourQuantite(entree, quantite) {
+  const e = quantite === entree.quantiteGrammes
+    ? entree
+    : calculerValeursEntree({ ...entree, quantiteGrammes: quantite });
+  return {
+    calories: e.caloriesCalculees,
+    proteines: e.proteinesCalculees,
+    glucides: e.glucidesCalculees,
+    lipides: e.lipidesCalculees
+  };
+}
+
+// Remplit le tableau "Pour X g | Pour 100 g". Une valeur inconnue (une
+// ancienne ligne dont la fiche produit est introuvable) est affichée
+// comme telle, jamais remplacée par un 0 trompeur.
+function afficherTableauNutrition(entree, quantite) {
+  const consomme = valeursPourQuantite(entree, quantite);
+  const lignes = [
+    { libelle: 'Calories',  consomme: consomme.calories,  pour100g: entree.caloriesPour100g,  unite: 'kcal' },
+    { libelle: 'Protéines', consomme: consomme.proteines, pour100g: entree.proteinesPour100g, unite: 'g' },
+    { libelle: 'Glucides',  consomme: consomme.glucides,  pour100g: entree.glucidesPour100g,  unite: 'g' },
+    { libelle: 'Lipides',   consomme: consomme.lipides,   pour100g: entree.lipidesPour100g,   unite: 'g' }
+  ];
+  const cellule = (valeur, unite) => (valeur === null || valeur === undefined
+    ? '<span class="valeur-inconnue">non renseigné</span>'
+    : `${formaterNombre(valeur)} ${unite}`);
+
+  $('#detail-entete-quantite').textContent = `Pour ${formaterNombre(quantite, 2)} g`;
+  $('#detail-lignes').innerHTML = lignes.map((l) => `
+    <tr>
+      <th scope="row">${l.libelle}</th>
+      <td>${cellule(l.consomme, l.unite)}</td>
+      <td>${cellule(l.pour100g, l.unite)}</td>
+    </tr>
+  `).join('');
+  $('#detail-valeurs-inconnues').hidden = lignes.every((l) => l.pour100g !== null && l.pour100g !== undefined);
+}
+
+$('#btn-fermer-detail').addEventListener('click', () => dialogueDetail.close());
+
+
+/* ============================================================
+   20. DÉMARRAGE
    ============================================================ */
 
 async function demarrer() {
   construireSections();
   await BDD.ouvrir();
+
+  // Phase 7 : complète les lignes du journal enregistrées par une
+  // version précédente (voir section 3). Sans effet si tout est déjà à
+  // jour. Un échec ne doit pas empêcher l'application de s'ouvrir : la
+  // fenêtre de détail sait aussi compléter une ligne à la demande.
+  try {
+    await migrerAnciennesEntrees();
+  } catch (erreur) {
+    console.warn('Migration des anciennes lignes du journal impossible :', erreur);
+  }
 
   // Premier lancement : aucun objectif n'a jamais été défini. On invite
   // l'utilisateur à en choisir un avant de lui montrer le journal.

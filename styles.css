@@ -282,7 +282,23 @@ main {
   padding: 8px 10px;
 }
 
-.ligne-aliment .info { flex: 1; min-width: 0; }
+/* Nom + quantité + calories forment un seul grand bouton : le toucher
+   ouvre le détail de l'aliment (Phase 7). On lui retire l'allure d'un
+   bouton pour que la ligne garde son aspect d'origine. */
+.btn-detail {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: transparent;
+  padding: 2px 4px;
+  min-height: 40px;
+  text-align: left;
+  border-radius: 8px;
+}
+
+.ligne-aliment .info { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .ligne-aliment .nom { font-weight: 600; overflow-wrap: anywhere; }
 .ligne-aliment .detail { color: var(--texte-doux); font-size: 0.85rem; }
 
@@ -630,6 +646,53 @@ main {
   background: var(--surface-2);
   border-radius: 10px;
   font-size: 0.9rem;
+}
+
+/* ---------- Détail d'un aliment du journal (Phase 7) ---------- */
+.tableau-nutrition {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 6px;
+  font-size: 0.95rem;
+}
+
+.tableau-nutrition th,
+.tableau-nutrition td {
+  padding: 9px 6px;
+  text-align: right;
+  border-bottom: 1px solid var(--bord);
+}
+
+.tableau-nutrition tbody tr:last-child th,
+.tableau-nutrition tbody tr:last-child td { border-bottom: none; }
+
+/* Première colonne (nom du nutriment) alignée à gauche, les chiffres à droite. */
+.tableau-nutrition th:first-child { text-align: left; }
+
+.tableau-nutrition thead th {
+  color: var(--texte-doux);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.tableau-nutrition tbody th { font-weight: 600; }
+
+/* La colonne "quantité consommée" est celle qui compte : en gras ;
+   la colonne "pour 100 g" sert de repère, plus discrète. */
+.tableau-nutrition td:nth-child(2) { font-weight: 700; }
+.tableau-nutrition td:nth-child(3) { color: var(--texte-doux); }
+
+.valeur-inconnue {
+  color: var(--texte-doux);
+  font-weight: 400;
+  font-style: italic;
+  font-size: 0.85rem;
+}
+
+.detail-note {
+  margin: 10px 0 0;
+  color: var(--texte-doux);
+  font-size: 0.85rem;
 }
 
 /* ---------- Analyse OCR d'une photo d'étiquette ---------- */
