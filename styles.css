@@ -22,6 +22,9 @@
      un texte blanc fixe manquait de contraste en thème sombre — d'où
      cette variable plutôt qu'une couleur codée en dur. */
   --texte-sur-danger: #2a0a08;
+  /* Étoile des favoris : le doré habituel des étoiles, assez clair pour
+     ressortir sur fond sombre (une version plus foncée en thème clair). */
+  --favori:      #f2c14e;
   --rayon: 14px;
   --duree: 160ms;
 }
@@ -39,6 +42,7 @@
     --danger:      #c0392b;
     --danger-fond: #fbe4e1;
     --texte-sur-danger: #ffffff;
+    --favori:      #a86b00;
   }
 }
 
@@ -296,6 +300,27 @@ main {
   font-size: 1rem;
 }
 
+/* Étoile "favori", à gauche du nom (loin du ✕ de suppression, pour
+   éviter de supprimer un aliment en voulant le mettre en favori). */
+.btn-favori {
+  background: transparent;
+  color: var(--texte-doux);
+  min-width: 36px;
+  min-height: 36px;
+  padding: 0;
+  font-size: 1.25rem;
+  line-height: 1;
+}
+
+.btn-favori[aria-pressed="true"] { color: var(--favori); }
+
+/* Espace réservé quand la fiche produit est introuvable : garde les
+   noms alignés avec ceux des lignes qui ont une étoile. */
+.btn-favori-vide {
+  width: 36px;
+  flex-shrink: 0;
+}
+
 /* ---------- Pied : barres de progression du jour ---------- */
 .pied-total {
   position: fixed;
@@ -494,6 +519,65 @@ main {
 .bouton-choix em { color: var(--texte-doux); font-style: normal; font-size: 0.85rem; }
 
 .choix-icone { font-size: 1.3rem; line-height: 1; }
+
+/* ---------- Favoris (fenêtre "Ajouter un aliment") ---------- */
+.titre-choix {
+  margin: 14px 0 6px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--texte-doux);
+}
+
+.titre-choix span { color: var(--favori); }
+
+/* Liste limitée en hauteur : avec beaucoup de favoris, elle défile
+   d'elle-même au lieu de repousser les autres boutons hors de l'écran. */
+.liste-favoris {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 40vh;
+  overflow-y: auto;
+}
+
+.ligne-favori {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--surface-2);
+  border-radius: 10px;
+}
+
+.btn-choisir-favori {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  text-align: left;
+  background: transparent;
+  padding: 8px 12px;
+}
+
+.btn-choisir-favori .nom { font-weight: 600; overflow-wrap: anywhere; }
+.btn-choisir-favori .detail { color: var(--texte-doux); font-size: 0.85rem; }
+
+.btn-retirer-favori {
+  background: transparent;
+  color: var(--favori);
+  min-width: 44px;
+  padding: 0;
+  font-size: 1.25rem;
+}
+
+.favoris-vide {
+  margin: 0;
+  color: var(--texte-doux);
+  font-size: 0.85rem;
+}
 
 /* ---------- Scanner de code-barres ---------- */
 .boite-dialogue-scanner { width: min(92vw, 480px); }

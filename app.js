@@ -19,6 +19,8 @@
    directement à un jour passé (en plus du ◀▶ de la Phase 1), jours
    passés en lecture seule (suppression toujours possible), vue
    "Tendances" avec graphique CSS des 7 derniers jours.
+   Phase 7 (confort de saisie) : aliments favoris (étoile sur chaque
+   ligne du journal, liste des favoris dans la fenêtre d'ajout).
    ============================================================ */
 
 'use strict';
@@ -158,6 +160,42 @@ async function supprimerAliment(id) {
   await BDD.supprimer('journal', id);
 }
 
+// Une ligne du journal ne désigne pas sa fiche produit de la même façon
+// selon l'origine de l'aliment : un produit scanné est désigné par son
+// code-barres (un texte), un aliment saisi à la main ou lu sur une
+// photo par le numéro de sa fiche (un nombre). Ces deux fonctions
+// savent retrouver la fiche dans les deux cas.
+
+// Retrouve la fiche d'UNE ligne (lecture directe dans la base).
+async function produitDeLEntree(entree) {
+  if (typeof entree.produitRef === 'number') {
+    return (await BDD.unePar('produits', entree.produitRef)) || null;
+  }
+  if (typeof entree.produitRef === 'string') {
+    const trouves = await BDD.parIndex('produits', 'parCodeBarres', entree.produitRef);
+    return trouves[0] || null;
+  }
+  return null;
+}
+
+// Pour retrouver la fiche de BEAUCOUP de lignes d'un coup (affichage du
+// journal) : à partir de la liste complète des produits, déjà lue une
+// seule fois, renvoie une fonction qui fait la correspondance sans
+// relire la base pour chaque ligne.
+function indexerProduits(produits) {
+  const parNumero = new Map();
+  const parCodeBarres = new Map();
+  produits.forEach((p) => {
+    parNumero.set(p.id, p);
+    if (p.codeBarres) parCodeBarres.set(p.codeBarres, p);
+  });
+
+  return (entree) => {
+    if (typeof entree.produitRef === 'number') return parNumero.get(entree.produitRef) || null;
+    return parCodeBarres.get(entree.produitRef) || null;
+  };
+}
+
 
 /* ============================================================
    4. OBJECTIFS — objectifs quotidiens de calories et de protéines
@@ -259,6 +297,7 @@ async function rafraichirEcran() {
   $('#mention-lecture-seule').hidden = estAujourdhui;
 
   const entrees = await entreesDuJour(jourAffiche);
+  const produitDe = indexerProduits(await BDD.tout('produits'));
   let totalCaloriesJour = 0;
   let totalProteinesJour = 0;
 
@@ -278,6 +317,7 @@ async function rafraichirEcran() {
 
     liste.innerHTML = entreesRepas.map((e) => `
       <li class="ligne-aliment" data-id="${e.id}">
+        ${htmlBoutonFavori(e, produitDe(e))}
         <div class="info">
           <div class="nom">${echapper(e.nomAffiche)}</div>
           <div class="detail">${e.quantiteGrammes} g</div>
@@ -613,12 +653,15 @@ const dialogueChoix = $('#dialogue-choix-ajout');
 
 // Ouvre le petit menu affiché quand on appuie sur le "+" d'un repas :
 // c'est à partir de là que l'utilisateur choisit comment renseigner
-// l'aliment. `repasCible` (déclaré section 8) est réutilisé par les
-// trois chemins possibles (scanner, photo, manuel).
-function ouvrirChoixAjout(repasId) {
+// l'aliment. `repasCible` (déclaré section 8) est réutilisé par tous
+// les chemins possibles (favori, scanner, photo, manuel). La liste des
+// favoris (section 18) est reconstruite à chaque ouverture.
+async function ouvrirChoixAjout(repasId) {
   suivreChangementDeJour(); // l'écran est peut-être resté allumé après minuit
   repasCible = repasId;
-  dialogueChoix.showModal();
+  await afficherFavoris();
+  // Deux appuis rapides sur "+" : la fenêtre est peut-être déjà ouverte.
+  if (!dialogueChoix.open) dialogueChoix.showModal();
 }
 
 $('#btn-annuler-choix').addEventListener('click', () => dialogueChoix.close());
@@ -831,7 +874,9 @@ async function traiterCodeBarres(codeBarres) {
   try {
     const { produit, depuisCache } = await rechercherProduit(codeBarres);
     dialogueScanner.close();
-    ouvrirConfirmation(produit, depuisCache);
+    ouvrirConfirmation(produit, depuisCache
+      ? 'Produit déjà scanné précédemment (depuis le cache local)'
+      : 'Produit trouvé sur Open Food Facts');
   } catch (erreur) {
     if (erreur && erreur.type === 'reseau') {
       afficherErreurScanner("Pas de connexion internet : impossible de vérifier ce produit sur Open Food Facts. Réessayez une fois connecté, ou passez à la saisie manuelle.");
@@ -854,19 +899,18 @@ const formConfirmation = $('#form-confirmation');
 // Produit actuellement affiché dans l'écran de confirmation (retenu
 // pour connaître son id et son code-barres au moment de la validation).
 // Reste `null` quand la confirmation vient de l'OCR (section 13) plutôt
-// que du scanner : il n'y a alors pas encore de produit existant à
-// mettre à jour, il faudra en créer un nouveau à la validation.
+// que du scanner ou des favoris : il n'y a alors pas encore de produit
+// existant à mettre à jour, il faudra en créer un nouveau à la validation.
 let produitEnConfirmation = null;
 
-// Pré-remplit l'écran de confirmation avec les valeurs du produit
-// trouvé (cache local ou Open Food Facts) ; tous les champs restent
-// modifiables par l'utilisateur avant l'ajout définitif au journal.
-function ouvrirConfirmation(produit, depuisCache) {
+// Pré-remplit l'écran de confirmation avec les valeurs d'un produit
+// déjà connu (scanné, ou choisi dans les favoris) ; tous les champs
+// restent modifiables par l'utilisateur avant l'ajout définitif au
+// journal. `origine` est la petite phrase affichée sous le titre.
+function ouvrirConfirmation(produit, origine) {
   produitEnConfirmation = produit;
 
-  $('#confirmation-origine').textContent = depuisCache
-    ? 'Produit déjà scanné précédemment (depuis le cache local)'
-    : 'Produit trouvé sur Open Food Facts';
+  $('#confirmation-origine').textContent = origine;
 
   $('#c-nom').value = produit.nom;
   $('#c-calories').value = produit.caloriesPour100g;
@@ -902,27 +946,31 @@ function mettreAJourCalculConfirmation() {
 
 $('#btn-annuler-confirmation').addEventListener('click', () => dialogueConfirmation.close());
 
-// Ajoute au journal un aliment identifié via le scanner. Contrairement
+// Ajoute au journal un aliment dont la fiche existe déjà : produit
+// identifié via le scanner, ou choisi dans les favoris. Contrairement
 // à l'ajout manuel (qui crée toujours un nouveau produit "manuel"),
-// on met ici à jour le produit déjà présent dans le cache local
-// plutôt que d'en créer un doublon — utile si l'utilisateur vient de
-// corriger une valeur erronée à l'écran de confirmation.
-async function ajouterAlimentScanne({ produitId, codeBarres, nom, quantite, calories, proteines, glucides, lipides, repas }) {
+// on met ici à jour la fiche existante plutôt que d'en créer un
+// doublon — utile si l'utilisateur vient de corriger une valeur
+// erronée à l'écran de confirmation. Le reste de la fiche (code-barres,
+// origine, marque "favori") est recopié tel quel grâce à `...produit` :
+// sans cela, valider un produit lui ferait perdre sa place dans les favoris.
+async function ajouterAlimentConnu({ produit, nom, quantite, calories, proteines, glucides, lipides, repas }) {
   await BDD.remplacer('produits', {
-    id: produitId,
-    codeBarres,
+    ...produit,
     nom,
     caloriesPour100g: calories,
     proteinesPour100g: proteines,
     glucidesPour100g: glucides,
-    lipidesPour100g: lipides,
-    source: 'openfoodfacts'
+    lipidesPour100g: lipides
   });
 
   const entree = {
     date: jourAffiche,
     repas,
-    produitRef: codeBarres,
+    // Un produit scanné reste désigné par son code-barres (comme depuis
+    // la Phase 3) ; une fiche sans code-barres (favori saisi à la main
+    // ou lu sur une photo) par son numéro.
+    produitRef: produit.codeBarres ?? produit.id,
     nomAffiche: nom,
     quantiteGrammes: quantite,
     caloriesCalculees: Math.round((calories * quantite) / 100 * 10) / 10,
@@ -952,14 +1000,9 @@ formConfirmation.addEventListener('submit', async (e) => {
   };
 
   if (produitEnConfirmation) {
-    // Produit déjà identifié via le scanner (cache local ou Open Food
-    // Facts) : on met à jour l'enregistrement existant plutôt que d'en
-    // créer un doublon.
-    await ajouterAlimentScanne({
-      ...valeursCommunes,
-      produitId: produitEnConfirmation.id,
-      codeBarres: produitEnConfirmation.codeBarres
-    });
+    // Produit déjà connu (scanner ou favoris) : on met à jour
+    // l'enregistrement existant plutôt que d'en créer un doublon.
+    await ajouterAlimentConnu({ ...valeursCommunes, produit: produitEnConfirmation });
   } else {
     // Confirmation venue de l'OCR (section 13) : aucun produit existant,
     // on en crée un nouveau comme pour un ajout manuel.
@@ -1504,7 +1547,111 @@ async function rafraichirTendances() {
 
 
 /* ============================================================
-   18. DÉMARRAGE
+   18. FAVORIS — étoile sur le journal, liste dans la fenêtre d'ajout
+   ============================================================
+   Un favori est simplement une fiche du magasin "produits" qui porte
+   `favori: true`. Les fiches enregistrées avant cette fonctionnalité
+   n'ont pas ce champ : elles sont lues comme "pas favori", aucune
+   conversion des anciennes données n'est donc nécessaire. */
+
+// Construit le bouton étoile d'une ligne du journal. Sans fiche produit
+// retrouvée (cas qui ne devrait pas arriver), on laisse un espace vide
+// de la même largeur pour garder les lignes alignées.
+function htmlBoutonFavori(entree, produit) {
+  if (!produit) return '<span class="btn-favori-vide" aria-hidden="true"></span>';
+
+  const estFavori = produit.favori === true;
+  return `
+    <button type="button" class="btn-favori" data-id="${entree.id}"
+            aria-pressed="${estFavori}" aria-label="Favori : ${echapper(entree.nomAffiche)}"
+            title="${estFavori ? 'Retirer des favoris' : 'Ajouter aux favoris'}">${estFavori ? '★' : '☆'}</button>`;
+}
+
+// Ajoute la fiche aux favoris, ou l'en retire si elle y était déjà.
+// Renvoie le nouvel état (true = c'est maintenant un favori).
+async function basculerFavori(produit) {
+  produit.favori = !produit.favori;
+  await BDD.remplacer('produits', produit);
+  return produit.favori;
+}
+
+// Appui sur l'étoile d'une ligne du journal.
+conteneur.addEventListener('click', async (e) => {
+  const btn = e.target.closest('.btn-favori');
+  if (!btn) return;
+
+  const id = Number(btn.dataset.id);
+  const entree = await BDD.unePar('journal', id);
+  const produit = entree ? await produitDeLEntree(entree) : null;
+  if (!produit) return;
+
+  const estFavori = await basculerFavori(produit);
+  await rafraichirEcran();
+  // L'écran vient d'être redessiné : on remet le focus sur la nouvelle
+  // étoile pour ne pas perdre sa place (clavier, lecteur d'écran).
+  const nouvelleEtoile = conteneur.querySelector(`.btn-favori[data-id="${id}"]`);
+  if (nouvelleEtoile) nouvelleEtoile.focus();
+  annoncer(estFavori ? `${produit.nom} ajouté aux favoris.` : `${produit.nom} retiré des favoris.`);
+});
+
+const listeFavoris = $('#liste-favoris');
+const messageFavorisVide = $('#favoris-vide');
+
+// Tous les favoris, classés par ordre alphabétique.
+async function produitsFavoris() {
+  const produits = await BDD.tout('produits');
+  return produits
+    .filter((p) => p.favori === true)
+    .sort((a, b) => a.nom.localeCompare(b.nom, 'fr'));
+}
+
+// (Re)construit la liste des favoris dans la fenêtre "Ajouter un aliment".
+async function afficherFavoris() {
+  const favoris = await produitsFavoris();
+  messageFavorisVide.hidden = favoris.length > 0;
+
+  listeFavoris.innerHTML = favoris.map((p) => `
+    <li class="ligne-favori">
+      <button type="button" class="btn-choisir-favori" data-id="${p.id}">
+        <span class="nom">${echapper(p.nom)}</span>
+        <span class="detail">${Math.round(p.caloriesPour100g)} kcal / 100 g</span>
+      </button>
+      <button type="button" class="btn-retirer-favori" data-id="${p.id}"
+              aria-label="Retirer ${echapper(p.nom)} des favoris" title="Retirer des favoris">★</button>
+    </li>
+  `).join('');
+}
+
+listeFavoris.addEventListener('click', async (e) => {
+  // Étoile pleine à droite d'un favori : on le retire de la liste.
+  const btnRetirer = e.target.closest('.btn-retirer-favori');
+  if (btnRetirer) {
+    const produit = await BDD.unePar('produits', Number(btnRetirer.dataset.id));
+    if (!produit || !produit.favori) return;
+    await basculerFavori(produit);
+    await afficherFavoris();
+    await rafraichirEcran(); // les étoiles du journal suivent le changement
+    annoncer(`${produit.nom} retiré des favoris.`);
+    return;
+  }
+
+  // Nom d'un favori : on passe directement à l'écran de confirmation
+  // (le même que pour un produit scanné), le curseur dans la quantité,
+  // puisque c'est la seule chose qui change d'une fois sur l'autre.
+  const btnChoisir = e.target.closest('.btn-choisir-favori');
+  if (btnChoisir) {
+    const produit = await BDD.unePar('produits', Number(btnChoisir.dataset.id));
+    if (!produit) return;
+    dialogueChoix.close();
+    ouvrirConfirmation(produit, 'Depuis vos favoris — valeurs modifiables avant l\'ajout');
+    $('#c-quantite').focus();
+    $('#c-quantite').select();
+  }
+});
+
+
+/* ============================================================
+   19. DÉMARRAGE
    ============================================================ */
 
 async function demarrer() {

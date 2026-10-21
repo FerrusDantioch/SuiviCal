@@ -179,6 +179,18 @@
 <!-- ====== Choix du mode d'ajout : scanner, photo de l'étiquette ou saisie manuelle ====== -->
 <dialog id="dialogue-choix-ajout" class="boite-dialogue">
   <h2>Ajouter un aliment</h2>
+
+  <!-- Favoris : liste remplie par app.js (section 18) à chaque ouverture.
+       Toucher un nom ouvre l'écran de confirmation, déjà pré-rempli. -->
+  <section class="favoris" aria-labelledby="titre-favoris">
+    <h3 id="titre-favoris" class="titre-choix"><span aria-hidden="true">★</span> Favoris</h3>
+    <ul id="liste-favoris" class="liste-favoris"></ul>
+    <p id="favoris-vide" class="favoris-vide" hidden>
+      Aucun favori pour l'instant. Touchez l'étoile ☆ à côté d'un aliment du journal pour le retrouver ici.
+    </p>
+  </section>
+
+  <h3 class="titre-choix">Nouvel aliment</h3>
   <div class="choix-ajout">
     <button type="button" id="btn-choix-scanner" class="bouton-choix">
       <span class="choix-icone" aria-hidden="true">📷</span>
