@@ -649,6 +649,10 @@ main {
 }
 
 /* ---------- Détail d'un aliment du journal (Phase 7) ---------- */
+/* Le titre reçoit le focus à l'ouverture (voir index.html) : pas de
+   cadre autour, ce n'est pas un élément sur lequel on agit. */
+#detail-nom:focus { outline: none; }
+
 .tableau-nutrition {
   width: 100%;
   border-collapse: collapse;

@@ -23,7 +23,8 @@
    ligne du journal, liste des favoris dans la fenêtre d'ajout) ;
    quantités et valeurs à décimales, avec virgule ou point ; détail
    d'un aliment du journal (calories, protéines, glucides, lipides pour
-   la quantité consommée), avec migration des anciennes lignes.
+   la quantité consommée), avec migration des anciennes lignes ;
+   modification de la quantité d'un aliment déjà enregistré.
    ============================================================ */
 
 'use strict';
@@ -273,6 +274,16 @@ async function supprimerAliment(id) {
   await BDD.supprimer('journal', id);
 }
 
+// Change la quantité d'une ligne du journal et recalcule ses valeurs
+// (calories, protéines, glucides, lipides) à partir de ses valeurs pour
+// 100 g. Les totaux du jour, calculés à chaque affichage à partir des
+// lignes, suivent donc d'eux-mêmes.
+async function modifierQuantite(entree, quantite) {
+  entree.quantiteGrammes = quantite;
+  calculerValeursEntree(entree);
+  await BDD.remplacer('journal', entree);
+}
+
 // Une ligne du journal ne désigne pas sa fiche produit de la même façon
 // selon l'origine de l'aliment : un produit scanné est désigné par son
 // code-barres (un texte), un aliment saisi à la main ou lu sur une
@@ -500,7 +511,7 @@ async function rafraichirEcran() {
     liste.innerHTML = entreesRepas.map((e) => `
       <li class="ligne-aliment" data-id="${e.id}">
         ${htmlBoutonFavori(e, produitDe(e))}
-        <button type="button" class="btn-detail" data-id="${e.id}" title="Voir le détail">
+        <button type="button" class="btn-detail" data-id="${e.id}" title="Voir le détail ou modifier la quantité">
           <span class="info">
             <span class="nom">${echapper(e.nomAffiche)}</span>
             <span class="detail">${formaterNombre(e.quantiteGrammes, 2)} g</span>
@@ -1837,14 +1848,19 @@ listeFavoris.addEventListener('click', async (e) => {
 
 
 /* ============================================================
-   19. DÉTAIL D'UN ALIMENT DU JOURNAL
+   19. DÉTAIL D'UN ALIMENT DU JOURNAL — et modification de la quantité
    ============================================================
    Toucher un aliment du journal (son nom ou ses calories) ouvre une
    fenêtre avec ses calories et macronutriments pour la quantité
-   consommée, à côté des valeurs pour 100 g. Disponible aussi pour les
-   jours passés (simple consultation). */
+   consommée, à côté des valeurs pour 100 g. La quantité y est
+   modifiable : le tableau se recalcule pendant la frappe, et
+   "Enregistrer" met à jour la ligne et les totaux du jour. Comme la
+   suppression, la modification reste possible sur un jour passé, pour
+   corriger une erreur. */
 
 const dialogueDetail = $('#dialogue-detail');
+const formDetail = $('#form-detail');
+const champQuantiteDetail = $('#d-quantite');
 
 // Ligne du journal affichée dans la fenêtre de détail.
 let entreeEnDetail = null;
@@ -1863,6 +1879,7 @@ async function ouvrirDetail(id) {
   const repas = REPAS.find((r) => r.id === entree.repas);
   $('#detail-nom').textContent = entree.nomAffiche;
   $('#detail-contexte').textContent = `${repas ? repas.label : ''} · ${libelleJour(entree.date)}`;
+  champQuantiteDetail.value = nombreVersChamp(entree.quantiteGrammes);
   afficherTableauNutrition(entree, entree.quantiteGrammes);
 
   if (!dialogueDetail.open) dialogueDetail.showModal();
@@ -1911,6 +1928,32 @@ function afficherTableauNutrition(entree, quantite) {
 }
 
 $('#btn-fermer-detail').addEventListener('click', () => dialogueDetail.close());
+brancherVerificationNombres(formDetail);
+
+// Pendant la frappe : le tableau suit la quantité tapée (tant qu'elle
+// est valide), pour voir l'effet du changement avant de l'enregistrer.
+champQuantiteDetail.addEventListener('input', () => {
+  const quantite = lireNombre(champQuantiteDetail.value);
+  if (entreeEnDetail && quantite > 0) afficherTableauNutrition(entreeEnDetail, quantite);
+});
+
+formDetail.addEventListener('submit', async (e) => {
+  const entree = entreeEnDetail; // retenue ici : la fenêtre se ferme tout de suite
+  const quantite = lireNombre(champQuantiteDetail.value);
+
+  if (!entree || !(quantite > 0)) {
+    e.preventDefault();
+    return;
+  }
+
+  // Quantité inchangée (telle qu'elle était affichée dans le champ) :
+  // la fenêtre se ferme simplement, sans rien recalculer.
+  if (quantite === lireNombre(nombreVersChamp(entree.quantiteGrammes))) return;
+
+  await modifierQuantite(entree, quantite);
+  await rafraichirEcran();
+  annoncer(`${entree.nomAffiche} : quantité modifiée (${formaterNombre(quantite, 2)} g).`);
+});
 
 
 /* ============================================================

@@ -286,11 +286,17 @@
 
 <!-- ====== Détail d'un aliment du journal (Phase 7) ======
      Ouvert en touchant un aliment du journal ; tableau rempli par
-     app.js (section 19). -->
+     app.js (section 19), qui le recalcule pendant qu'on modifie la quantité. -->
 <dialog id="dialogue-detail" class="boite-dialogue" aria-labelledby="detail-nom">
   <form id="form-detail" class="formulaire" method="dialog">
-    <h2 id="detail-nom">Aliment</h2>
+    <!-- `autofocus` sur le titre : à l'ouverture, le curseur va sur le
+         titre et non dans le champ quantité, pour que le clavier du
+         téléphone ne surgisse pas en cachant le tableau. -->
+    <h2 id="detail-nom" tabindex="-1" autofocus>Aliment</h2>
     <p id="detail-contexte" class="confirmation-origine"></p>
+
+    <label for="d-quantite">Quantité consommée (g)</label>
+    <input type="text" id="d-quantite" name="quantite" required inputmode="decimal" autocomplete="off" data-nombre="quantite">
 
     <table class="tableau-nutrition">
       <thead>
@@ -307,7 +313,8 @@
     </p>
 
     <div class="dialogue-actions">
-      <button type="button" id="btn-fermer-detail" class="bouton-principal">Fermer</button>
+      <button type="button" id="btn-fermer-detail" class="bouton-secondaire">Fermer</button>
+      <button type="submit" class="bouton-principal">Enregistrer</button>
     </div>
   </form>
 </dialog>
