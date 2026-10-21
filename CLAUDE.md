@@ -109,6 +109,15 @@ fichier.
 - **`produitRef` a deux formes** : code-barres (texte) pour un produit
   scanné, numéro de fiche (nombre) sinon. `produitDeLEntree` /
   `indexerProduits` gèrent les deux.
+- **Pas de fiche en double** : une saisie manuelle (ou OCR) réutilise
+  une fiche sans code-barres identique (`ficheIdentique` : même nom aux
+  majuscules/accents/espaces près, même unité, mêmes valeurs pour
+  100 g — voir `empreinteAliment`). Les doublons créés avant la
+  Phase 7 sont fusionnés au démarrage (`fusionnerFichesEnDouble`,
+  appelée par la migration) : fiche favorite gardée en priorité, sinon
+  la plus ancienne ; lignes du journal rattachées, doublons supprimés,
+  en une transaction. Même nom mais valeurs différentes = aliments
+  distincts, volontairement (pain complet / pain blanc).
 - **Migration** (`migrerAnciennesDonnees`, appelée dans `demarrer`) :
   complète les lignes et fiches d'avant la Phase 7 (repérées par
   l'absence de `caloriesPour100g` ou d'`unite`), en une transaction par

@@ -94,6 +94,17 @@ const BDD = {
   remplacerPlusieurs(magasin, entrees) {
     return BDD.operation(magasin, 'readwrite', (m) => { entrees.forEach((e) => m.put(e)); });
   },
+  // Écrit dans plusieurs magasins dans une seule transaction (même
+  // principe : tout ou rien). `action` reçoit une fonction qui donne
+  // accès à un magasin par son nom.
+  ecrireDansPlusieurs(magasins, action) {
+    return new Promise((resoudre, rejeter) => {
+      const t = BDD.base.transaction(magasins, 'readwrite');
+      action((nom) => t.objectStore(nom));
+      t.oncomplete = () => resoudre();
+      t.onerror = () => rejeter(t.error);
+    });
+  },
   unePar(magasin, id)        { return BDD.operation(magasin, 'readonly',  (m) => m.get(id)); },
   parIndex(magasin, index, valeur) {
     return BDD.operation(magasin, 'readonly', (m) => m.index(index).getAll(valeur));
@@ -255,6 +266,30 @@ function nouvelleEntree({ repas, produitRef, nom, quantite, unite, calories, pro
   });
 }
 
+// "Empreinte" d'une fiche sans code-barres : deux fiches qui ont la même
+// décrivent le même aliment. Même nom (sans tenir compte des
+// majuscules, des accents ni des espaces en trop), même unité et
+// exactement les mêmes valeurs pour 100 g. Deux "Pain" de valeurs
+// différentes (complet / blanc) restent volontairement distincts.
+function empreinteAliment(p) {
+  return [
+    normaliser(String(p.nom).trim().replace(/\s+/g, ' ')),
+    uniteDe(p),
+    p.caloriesPour100g,
+    p.proteinesPour100g,
+    p.glucidesPour100g,
+    p.lipidesPour100g
+  ].join('|');
+}
+
+// Cherche une fiche existante identique (sans code-barres) à celle
+// donnée ; renvoie null s'il n'y en a pas.
+async function ficheIdentique(produit) {
+  const empreinte = empreinteAliment(produit);
+  const produits = await BDD.tout('produits');
+  return produits.find((p) => !p.codeBarres && empreinteAliment(p) === empreinte) || null;
+}
+
 async function ajouterAliment({ nom, quantite, unite = 'g', calories, proteines, glucides, lipides, repas, source = 'manuel' }) {
   const produit = {
     codeBarres: null,
@@ -266,7 +301,11 @@ async function ajouterAliment({ nom, quantite, unite = 'g', calories, proteines,
     unite,
     source
   };
-  const idProduit = await BDD.ajouter('produits', produit);
+  // Le même aliment saisi une deuxième fois à la main réutilise sa
+  // fiche au lieu d'en créer une en double (Phase 7) : il garde ainsi
+  // son étoile de favori sur toutes ses lignes du journal.
+  const dejaConnu = await ficheIdentique(produit);
+  const idProduit = dejaConnu ? dejaConnu.id : await BDD.ajouter('produits', produit);
 
   await BDD.ajouter('journal', nouvelleEntree({
     repas,
@@ -407,7 +446,56 @@ async function migrerAnciennesDonnees() {
     await BDD.remplacerPlusieurs('produits', fichesACompleter);
   }
 
-  return lignesACompleter.length + fichesACompleter.length;
+  const fichesFusionnees = await fusionnerFichesEnDouble();
+
+  return lignesACompleter.length + fichesACompleter.length + fichesFusionnees;
+}
+
+// Avant la Phase 7, chaque saisie manuelle créait une nouvelle fiche,
+// même pour un aliment déjà saisi à l'identique : une "Pomme" mangée
+// trois fois avait trois fiches, et l'étoile de favori n'en marquait
+// qu'une. On regroupe ici les fiches identiques (voir
+// `empreinteAliment`) en une seule :
+// - la fiche gardée est la favorite s'il y en a une, sinon la plus
+//   ancienne ; elle devient favorite si l'une des autres l'était ;
+// - les lignes du journal des fiches en double sont rattachées à la
+//   fiche gardée (leurs valeurs, copiées dans chaque ligne, et donc les
+//   totaux, ne changent pas), puis les doublons sont supprimés.
+// Tout se fait dans une seule transaction. Les produits scannés (avec
+// code-barres) ne sont jamais concernés : ils sont déjà uniques.
+// Renvoie le nombre de fiches supprimées.
+async function fusionnerFichesEnDouble() {
+  const groupes = new Map();
+  (await BDD.tout('produits'))
+    .filter((p) => !p.codeBarres)
+    .forEach((p) => {
+      const empreinte = empreinteAliment(p);
+      if (!groupes.has(empreinte)) groupes.set(empreinte, []);
+      groupes.get(empreinte).push(p);
+    });
+
+  const fichesGardees = [];
+  const doublons = new Map(); // numéro de la fiche en double → fiche gardée
+  groupes.forEach((fiches) => {
+    if (fiches.length < 2) return;
+    fiches.sort((a, b) => (b.favori === true) - (a.favori === true) || a.id - b.id);
+    const gardee = fiches[0];
+    gardee.favori = fiches.some((f) => f.favori === true);
+    fichesGardees.push(gardee);
+    fiches.slice(1).forEach((f) => doublons.set(f.id, gardee));
+  });
+  if (doublons.size === 0) return 0;
+
+  const lignesARattacher = (await BDD.tout('journal'))
+    .filter((e) => typeof e.produitRef === 'number' && doublons.has(e.produitRef));
+  lignesARattacher.forEach((e) => { e.produitRef = doublons.get(e.produitRef).id; });
+
+  await BDD.ecrireDansPlusieurs(['produits', 'journal'], (magasin) => {
+    fichesGardees.forEach((p) => magasin('produits').put(p));
+    doublons.forEach((_gardee, id) => magasin('produits').delete(id));
+    lignesARattacher.forEach((e) => magasin('journal').put(e));
+  });
+  return doublons.size;
 }
 
 // Lit une ligne du journal en s'assurant qu'elle est au format actuel.
