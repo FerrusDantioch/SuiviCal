@@ -109,7 +109,8 @@ aussi être ajouté à la liste `FICHIERS` du même fichier.
 | Modèle de français de [Tesseract](https://github.com/tesseract-ocr/tessdata_best) | — | Apache 2.0 |
 | Données produits [Open Food Facts](https://world.openfoodfacts.org) | — | Open Database License (ODbL) |
 
-Ces éléments gardent leur propre licence.
+Ces éléments gardent leur propre licence. Les textes complets des licences des
+bibliothèques sont dans le dossier `lib/` : voir [lib/LICENCES.md](lib/LICENCES.md).
 
 ## Licence
 
