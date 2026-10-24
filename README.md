@@ -80,7 +80,7 @@ Le site est publié par GitHub Pages depuis la branche `main`, dossier racine.
 
 Après toute modification de `index.html`, `app.js`, `styles.css`,
 `manifest.json` ou des icônes, augmentez le numéro de version tout en haut de
-`sw.js` (par exemple `omni-calories-v20` → `omni-calories-v21`). Sans cela,
+`sw.js` (par exemple `omni-calories-v21` → `omni-calories-v22`). Sans cela,
 les appareils continuent d'afficher l'ancienne version. Un nouveau fichier doit
 aussi être ajouté à la liste `FICHIERS` du même fichier.
 

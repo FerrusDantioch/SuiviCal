@@ -4,7 +4,7 @@
    ce fichier ne met en cache que les requêtes same-origin (type 'basic'),
    donc les appels API cross-origin ne sont jamais interceptés ici. */
 
-const CACHE = 'omni-calories-v20';
+const CACHE = 'omni-calories-v21';
 
 // Fichiers mis en cache dès l'installation (l'app shell : tout ce dont
 // l'app a besoin pour démarrer hors connexion). Le moteur OCR
@@ -40,10 +40,20 @@ self.addEventListener('install', (e) => {
   );
 });
 
+// Activation : on supprime les anciennes versions de NOTRE cache, et
+// seulement elles. Toutes les applications de ferrusdantioch.github.io
+// partagent la même liste de caches : supprimer tout ce qui n'est pas
+// CACHE effacerait aussi la copie hors ligne des autres applications
+// (Refuge, Cap…). On ne touche donc qu'aux noms qui commencent par
+// « omni-calories- » ou par « suivi-calorique- » (ancien nom de l'application).
+const PREFIXES_A_NOUS = ['omni-calories-', 'suivi-calorique-'];
+
 self.addEventListener('activate', (e) => {
   e.waitUntil(
     caches.keys()
-      .then((cles) => Promise.all(cles.filter((k) => k !== CACHE).map((k) => caches.delete(k))))
+      .then((cles) => Promise.all(cles
+        .filter((k) => k !== CACHE && PREFIXES_A_NOUS.some((p) => k.startsWith(p)))
+        .map((k) => caches.delete(k))))
       .then(() => self.clients.claim())
   );
 });

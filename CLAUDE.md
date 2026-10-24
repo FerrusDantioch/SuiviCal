@@ -87,7 +87,7 @@ Après toute modification d'un fichier **mis en cache** (`index.html`,
 haut de `sw.js` :
 
 ```js
-const CACHE = 'omni-calories-v20';   // → v21
+const CACHE = 'omni-calories-v21';   // → v22
 ```
 
 Sans ce changement, le navigateur ne retélécharge rien et toute personne
