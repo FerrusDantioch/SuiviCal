@@ -1,10 +1,10 @@
 {
-  "name": "Suivi Calorique",
-  "short_name": "Calories",
+  "name": "Omni-Calories",
+  "short_name": "Omni-Calories",
   "description": "Suivi des calories et macronutriments par repas, avec scan code-barres et objectifs quotidiens.",
   "lang": "fr",
   "dir": "ltr",
-  "id": "/SuiviCal/",
+  "id": "/omni-calories/",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",

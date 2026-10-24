@@ -1,10 +1,10 @@
-/* Service Worker de Suivi Calorique.
+/* Service Worker d'Omni-Calories.
    Rôle : rendre l'app shell utilisable hors connexion.
    Le scan code-barres (Open Food Facts) reste dépendant du réseau ;
    ce fichier ne met en cache que les requêtes same-origin (type 'basic'),
    donc les appels API cross-origin ne sont jamais interceptés ici. */
 
-const CACHE = 'suivi-calorique-v19';
+const CACHE = 'omni-calories-v20';
 
 // Fichiers mis en cache dès l'installation (l'app shell : tout ce dont
 // l'app a besoin pour démarrer hors connexion). Le moteur OCR

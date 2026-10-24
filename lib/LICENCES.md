@@ -1,7 +1,7 @@
 # Licences des bibliothèques du dossier `lib/`
 
 Ce dossier contient des copies figées de bibliothèques écrites par d'autres
-auteurs. Elles gardent leur propre licence, et non celle de Suivi Calorique
+auteurs. Elles gardent leur propre licence, et non celle d'Omni-Calories
 (décrite dans le fichier `LICENSE` à la racine du dépôt).
 
 Les textes de licence sont copiés sans aucune modification depuis les paquets

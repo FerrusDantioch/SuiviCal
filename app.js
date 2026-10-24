@@ -1,5 +1,5 @@
 /* ============================================================
-   SUIVI CALORIQUE — logique de l'application
+   OMNI-CALORIES — logique de l'application
    Phase 1 (socle) : schéma IndexedDB complet + CRUD, écran
    journal du jour avec ajout manuel par repas.
    Phase 2 (objectifs) : objectif quotidien de calories/protéines,

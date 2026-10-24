@@ -1,4 +1,4 @@
-# Suivi Calorique — notes pour Claude
+# Omni-Calories — notes pour Claude
 
 PWA de suivi calorique/nutritionnel, en **HTML/CSS/JS pur, sans dépendance ni
 compilation** (cohérent avec le reste du portfolio). Voir `ARCHITECTURE.md`
@@ -87,7 +87,7 @@ Après toute modification d'un fichier **mis en cache** (`index.html`,
 haut de `sw.js` :
 
 ```js
-const CACHE = 'suivi-calorique-v1';   // → v2
+const CACHE = 'omni-calories-v20';   // → v21
 ```
 
 Sans ce changement, le navigateur ne retélécharge rien et toute personne
@@ -311,7 +311,7 @@ pour n'importe quel magasin.
 
 ## Champ `id` du manifeste : nom du dossier, jamais `./`
 
-`manifest.json` contient `"id": "/SuiviCal/"`. Chrome résout `id` par rapport à
+`manifest.json` contient `"id": "/omni-calories/"`. Chrome résout `id` par rapport à
 la **racine du domaine** (`https://ferrusdantioch.github.io/`), pas par
 rapport au dossier de l'application : `"id": "./"` (ou `"."`) donnait donc
 l'identité de la racine du site, la même pour toutes les applications qui
@@ -320,6 +320,11 @@ l'utilisaient. C'est une exception voulue à la règle des chemins relatifs.
 Ne plus changer cette valeur : pour Chrome, une application déjà installée
 dont l'`id` change devient une autre application (il faut la désinstaller
 puis la réinstaller pour qu'elle reprenne les mises à jour).
+
+Exception unique (octobre 2026) : l'application s'appelait « Suivi Calorique » et
+vivait à `/SuiviCal/`. Le renommage du dépôt a changé son adresse,
+donc son `id` : les personnes qui l'avaient installée doivent la réinstaller
+depuis la nouvelle adresse (leurs données restent, le stockage n'a pas changé).
 
 ## ⚠️ Plusieurs applications sur `ferrusdantioch.github.io` : limite de Chrome Android
 

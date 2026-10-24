@@ -1,10 +1,10 @@
-# Suivi Calorique
+# Omni-Calories
 
 Application web (PWA) de suivi des calories et des nutriments, repas par
 repas : scan du code-barres, photo de l'étiquette, objectifs quotidiens. Sans
 compte : le journal et les objectifs restent sur l'appareil.
 
-**Ouvrir l'application :** https://ferrusdantioch.github.io/SuiviCal/
+**Ouvrir l'application :** https://ferrusdantioch.github.io/omni-calories/
 
 ---
 
@@ -59,7 +59,7 @@ Ouvrez l'adresse de l'application, puis menu ⋮ → **Installer l'application**
 
 Si Chrome indique « Cette appli est déjà installée » alors qu'elle ne l'est
 pas, c'est une limite de Chrome quand une autre application de
-`ferrusdantioch.github.io` est déjà installée. Installez Suivi Calorique
+`ferrusdantioch.github.io` est déjà installée. Installez Omni-Calories
 depuis Brave, ou choisissez « Créer un raccourci » dans Chrome.
 
 ## Tester sur un ordinateur
@@ -80,7 +80,7 @@ Le site est publié par GitHub Pages depuis la branche `main`, dossier racine.
 
 Après toute modification de `index.html`, `app.js`, `styles.css`,
 `manifest.json` ou des icônes, augmentez le numéro de version tout en haut de
-`sw.js` (par exemple `suivi-calorique-v18` → `suivi-calorique-v19`). Sans cela,
+`sw.js` (par exemple `omni-calories-v20` → `omni-calories-v21`). Sans cela,
 les appareils continuent d'afficher l'ancienne version. Un nouveau fichier doit
 aussi être ajouté à la liste `FICHIERS` du même fichier.
 
